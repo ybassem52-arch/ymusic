@@ -22,7 +22,6 @@ jobs:
 
     - name: Force Build Web Project (No Typecheck)
       run: |
-        # هنخليه يبني باستخدام الـ vite علطول عشان يتجاهل أوامر الفحص الرخمة
         pnpm exec vite build --emptyOutDir || npx vite build || true
 
     - name: Set up JDK 17
@@ -36,7 +35,8 @@ jobs:
 
     - name: Install Capacitor & Build APK
       run: |
-        pnpm add @capacitor/core @capacitor/cli @capacitor/android
+        # أضفنا -w عشان يوافق يثبت في الـ root للمشروع
+        pnpm add -w @capacitor/core @capacitor/cli @capacitor/android
         npx cap init ymusic app.ymusic.com --web-dir=dist || npx cap init ymusic app.ymusic.com --web-dir=build || true
         npx cap add android || true
         npx cap sync || true
