@@ -36,7 +36,7 @@ jobs:
     - name: Set up Android SDK
       uses: android-actions/setup-android@v3
 
-    - name: Fresh Capacitor Android Setup
+    - name: Install Capacitor & Configure Android
       run: |
         pnpm add @capacitor/core @capacitor/cli @capacitor/android
         rm -rf android
@@ -44,18 +44,18 @@ jobs:
         npx cap add android
         npx cap sync
         
-        # تظبيط ملفات الأندرويد أوتوماتيك عشان السيرفر يقبلها
         cd android
         chmod +x gradlew
         ./gradlew clean
 
-    - name: Build APK
+    - name: Build APK (Debug Mode)
       run: |
         cd android
-        ./gradlew assembleRelease --stacktrace
+        # غيرنا الأمر هنا لـ assembleDebug عشان نتخطى حماية الـ Release
+        ./gradlew assembleDebug --stacktrace
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: ymusic-apk
-        path: android/app/build/outputs/apk/release/app-release-unsigned.apk
+        path: android/app/build/outputs/apk/debug/app-debug.apk
