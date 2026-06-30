@@ -10,7 +10,7 @@ jobs:
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '22' # حدثنا الإصدار هنا لـ 22 عشان يوافق
+        node-version: '22'
 
     - name: Install pnpm
       uses: pnpm/action-setup@v3
@@ -24,7 +24,7 @@ jobs:
 
     - name: Build Web Project
       run: |
-        pnpm exec vite build --emptyOutDir || npx vite build || mkdir dist && echo "<html></html>" > dist/index.html
+        pnpm exec vite build --emptyOutDir || npx vite build
 
     - name: Set up JDK 17
       uses: actions/setup-java@v4
@@ -35,14 +35,23 @@ jobs:
     - name: Set up Android SDK
       uses: android-actions/setup-android@v3
 
-    - name: Install Capacitor & Build APK
+    - name: Install Capacitor & Configure Android
       run: |
         pnpm add @capacitor/core @capacitor/cli @capacitor/android
         rm -rf android
         npx cap init ymusic app.ymusic.com --web-dir=dist
         npx cap add android
         npx cap sync
-        cd android && ./gradlew assembleRelease
+        
+        # الحركة الصايعة لتصليح الـ Gradle على سيرفر جيت هب
+        cd android
+        chmod +x gradlew
+        ./gradlew wrapper --gradle-version 8.2
+
+    - name: Build APK
+      run: |
+        cd android
+        ./gradlew assembleRelease
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
