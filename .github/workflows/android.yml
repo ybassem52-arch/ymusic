@@ -14,16 +14,29 @@ jobs:
         java-version: '17'
         distribution: 'zulu'
 
-    - name: Change Wrapper Permissions
-      # الخطوة دي عشان ندعم ملف الـ gradlew يشتغل من غير مشاكل صلاحيات
-      run: chmod +x gradlew
-
-    - name: Build Debug APK
-      # الأمر السحري لبناء أي مشروع أندرويد نيتف
-      run: ./gradlew assembleDebug
+    - name: Find and Build Android Project Automatically
+      run: |
+        # البحث عن مكان ملف gradlew في المشروع كله
+        GRADLE_DIR=$(find . -name "gradlew" -exec dirname {} \;)
+        
+        if [ ! -z "$GRADLE_DIR" ]; then
+          echo "لقيت ملف الجرادل جوه مجلد: $GRADLE_DIR"
+          cd "$GRADLE_DIR"
+          
+          # إعطاء الصلاحيات وبناء الـ APK في مكانه الصح
+          chmod +x gradlew
+          ./gradlew assembleDebug
+          
+          # نسخ الـ APK للمجلد الرئيسي عشان الـ Upload يشوفه
+          mkdir -p $GITHUB_WORKSPACE/output-apk/
+          cp app/build/outputs/apk/debug/app-debug.apk $GITHUB_WORKSPACE/output-apk/app-debug.apk || cp build/outputs/apk/debug/app-debug.apk $GITHUB_WORKSPACE/output-apk/app-debug.apk
+        else
+          echo "ملف gradlew مش موجود خالص في الريبو دي!"
+          exit 1
+        fi
 
     - name: Upload Finished APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: ymusic-native-apk
-        path: app/build/outputs/apk/debug/app-debug.apk
+        path: output-apk/app-debug.apk
