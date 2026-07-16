@@ -157,7 +157,7 @@
         </div>
     </div>
 
-    <!-- مشغل يوتيوب الخلفي (جعله ظاهراً وحياً في الخلفية لحل مشاكل الحظر) -->
+    <!-- مشغل يوتيوب الخلفي -->
     <div class="fixed top-2 right-2 z-50 w-24 h-16 rounded overflow-hidden opacity-5 bg-black pointer-events-none">
         <div id="youtube-player"></div>
     </div>
@@ -169,8 +169,19 @@
         let player;
         let progressInterval;
         let isSeeking = false;
-        let favorites = JSON.parse(localStorage.getItem('ymusic_favs')) || [];
-        let playlists = JSON.parse(localStorage.getItem('ymusic_lists')) || { "التريند": [] };
+        
+        // الكود الآمن لقراءة الـ LocalStorage منعاً للكراش
+        let favorites = [];
+        try {
+            let savedFavs = localStorage.getItem('ymusic_favs');
+            favorites = savedFavs ? JSON.parse(savedFavs) : [];
+        } catch(e) { favorites = []; }
+
+        let playlists = { "التريند": [] };
+        try {
+            let savedLists = localStorage.getItem('ymusic_lists');
+            playlists = savedLists ? JSON.parse(savedLists) : { "التريند": [] };
+        } catch(e) { playlists = { "التريند": [] }; }
 
         // ألبوم أغاني عربي حقيقي وشغال فوراً
         const sampleSongs = [
@@ -179,6 +190,14 @@
             { id: "v18N_HkZ5_U", title: "تجي نعمل لغبطة", artist: "Amr Diab", img: "https://img.youtube.com/vi/v18N_HkZ5_U/0.jpg" },
             { id: "7Eisv77uM_4", title: "مخاصماك", artist: "Nawal", img: "https://img.youtube.com/vi/7Eisv77uM_4/0.jpg" }
         ];
+
+        // تشغيل البناء الأولي بمجرد تحميل الصفحة مباشرة ولا ننتظر الـ API فقط
+        window.addEventListener('DOMContentLoaded', () => {
+            currentQueue = [...sampleSongs];
+            renderTrending(currentQueue);
+            renderFavorites();
+            renderPlaylists();
+        });
 
         function onYouTubeIframeAPIReady() {
             player = new YT.Player('youtube-player', {
@@ -196,10 +215,7 @@
         }
 
         function onPlayerReady() {
-            currentQueue = [...sampleSongs];
-            renderTrending(currentQueue);
-            renderFavorites();
-            renderPlaylists();
+            // الـ API جاهز للتشغيل الآن
         }
 
         function onPlayerStateChange(event) {
@@ -241,12 +257,14 @@
                 document.getElementById(`${prefix}-artist`).innerText = song.artist;
                 document.getElementById(`${prefix}-img`).src = song.img;
             });
-            player.loadVideoById(song.id);
+            if (player && player.loadVideoById) {
+                player.loadVideoById(song.id);
+            }
             updateFavIcon();
         }
 
         function togglePlay() {
-            if (!player || currentTrackIndex === -1) return;
+            if (!player || currentTrackIndex === -1 || !player.getPlayerState) return;
             player.getPlayerState() === YT.PlayerState.PLAYING ? player.pauseVideo() : player.playVideo();
         }
 
@@ -330,8 +348,10 @@
             document.getElementById('np-fav-icon').className = isFav ? "fa-solid fa-heart text-red-500" : "fa-regular fa-heart";
         }
         function saveAndRefresh() {
-            localStorage.setItem('ymusic_favs', JSON.stringify(favorites));
-            localStorage.setItem('ymusic_lists', JSON.stringify(playlists));
+            try {
+                localStorage.setItem('ymusic_favs', JSON.stringify(favorites));
+                localStorage.setItem('ymusic_lists', JSON.stringify(playlists));
+            } catch(e) {}
             renderTrending(sampleSongs); renderFavorites(); renderPlaylists(); updateFavIcon();
         }
         function renderFavorites() {
