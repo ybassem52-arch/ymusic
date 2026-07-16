@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ymusic</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts & FontAwesome -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #0c0c0c;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .ymusic-red { background-color: #ff2d2d; }
+        .text-ymusic-red { color: #ff2d2d; }
+        ::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="text-zinc-400 h-screen flex flex-col overflow-hidden select-none">
+
+    <!-- ==================== شاشة البحث والرئيسية ==================== -->
+    <main id="screen-search" class="flex-1 overflow-y-auto px-4 pt-6 pb-24 space-y-5">
+        <h1 class="text-4xl font-extrabold text-ymusic-red tracking-tight px-1">ymusic</h1>
+        
+        <!-- حقل البحث -->
+        <div class="relative px-1">
+            <input type="text" id="search-input" placeholder="Search songs, artists..." 
+                   class="w-full bg-[#1e1e1e] text-white placeholder-zinc-500 rounded-2xl py-3.5 pl-12 pr-4 focus:outline-none text-base border border-transparent focus:border-zinc-800">
+            <i class="fa-solid fa-magnifying-glass absolute left-5 top-1/2 -translate-y-1/2 text-zinc-500 text-lg"></i>
+        </div>
+
+        <!-- التبويبات -->
+        <div class="flex space-x-2.5 overflow-x-auto pb-1 px-1">
+            <span class="ymusic-red text-white px-5 py-2.5 rounded-2xl text-xs font-bold cursor-pointer flex-shrink-0">All</span>
+            <span class="bg-[#1e1e1e] text-zinc-300 px-5 py-2.5 rounded-2xl text-xs font-semibold cursor-pointer flex-shrink-0">Pop</span>
+            <span class="bg-[#1e1e1e] text-zinc-300 px-5 py-2.5 rounded-2xl text-xs font-semibold cursor-pointer flex-shrink-0">Hip-Hop</span>
+            <span class="bg-[#1e1e1e] text-zinc-300 px-5 py-2.5 rounded-2xl text-xs font-semibold cursor-pointer flex-shrink-0">Rock</span>
+        </div>
+
+        <div class="space-y-3 px-1">
+            <h2 class="text-lg font-bold text-white tracking-wide" id="list-title">Trending</h2>
+            <div id="trending-list" class="space-y-3"></div>
+        </div>
+    </main>
+
+    <!-- ==================== شاشة المفضلة (Favorites) ==================== -->
+    <main id="screen-favorites" class="flex-1 overflow-y-auto px-4 pt-6 pb-24 space-y-5 hidden">
+        <div class="px-1">
+            <h1 class="text-3xl font-bold text-white">Favorites</h1>
+            <p id="fav-count" class="text-xs text-zinc-500 mt-1">0 songs</p>
+        </div>
+        <div class="px-1">
+            <button onclick="playAllFavorites()" class="ymusic-red text-white font-bold px-5 py-2 rounded-xl flex items-center space-x-2 text-xs">
+                <i class="fa-solid fa-play text-[10px]"></i> <span>Play All</span>
+            </button>
+        </div>
+        <div id="favorites-list" class="space-y-3 pt-1 px-1"></div>
+    </main>
+
+    <!-- ==================== شاشة قوائم التشغيل (Playlists) ==================== -->
+    <main id="screen-playlists" class="flex-1 overflow-y-auto px-4 pt-6 pb-24 space-y-5 hidden">
+        <div class="flex justify-between items-center px-1">
+            <h1 class="text-3xl font-bold text-white">Your Playlists</h1>
+            <button onclick="createNewPlaylist()" class="text-ymusic-red text-2xl">
+                <i class="fa-solid fa-plus-circle"></i>
+            </button>
+        </div>
+        <div id="playlists-list" class="grid grid-cols-2 gap-3 px-1"></div>
+    </main>
+
+    <!-- شاشة عرض محتوى مكتبة معينة -->
+    <main id="screen-playlist-view" class="flex-1 overflow-y-auto px-4 pt-6 pb-24 space-y-5 hidden">
+        <div class="flex items-center space-x-3 px-1">
+            <button onclick="switchScreen('playlists')" class="text-white text-lg"><i class="fa-solid fa-arrow-left"></i></button>
+            <h1 id="playlist-view-title" class="text-xl font-bold text-white">اسم القائمة</h1>
+        </div>
+        <div id="playlist-view-songs" class="space-y-3 px-1"></div>
+    </main>
+
+    <!-- ==================== شاشة المشغل الكامل (Now Playing) ==================== -->
+    <div id="now-playing-screen" class="fixed inset-0 bg-[#0c0c0c] z-50 transform translate-y-full transition-transform duration-300 flex flex-col justify-between p-6 pb-10">
+        <div class="flex justify-between items-center text-xs font-bold tracking-widest text-zinc-400">
+            <button onclick="minimizePlayer()" class="text-white text-lg"><i class="fa-solid fa-chevron-down"></i></button>
+            <span>NOW PLAYING</span>
+            <button onclick="toggleFavoriteCurrent()" class="text-lg"><i id="np-fav-icon" class="fa-regular fa-heart"></i></button>
+        </div>
+
+        <div class="flex-1 flex items-center justify-center my-4">
+            <img id="np-img" src="" class="w-full aspect-square object-cover rounded-2xl shadow-2xl max-w-[280px] border border-zinc-900">
+        </div>
+
+        <div class="space-y-5">
+            <div>
+                <h2 id="np-title" class="text-xl font-bold text-white truncate">Title</h2>
+                <p id="np-artist" class="text-zinc-500 text-xs mt-0.5 truncate">Artist</p>
+            </div>
+
+            <div class="space-y-1">
+                <input type="range" id="progress-bar" min="0" max="100" value="0" class="w-full accent-red-600 bg-zinc-800 h-1 rounded-lg appearance-none cursor-pointer">
+                <div class="flex justify-between text-[10px] text-zinc-500 font-medium">
+                    <span id="current-time">0:00</span>
+                    <span id="total-duration">0:00</span>
+                </div>
+            </div>
+
+            <div class="flex justify-center items-center space-x-8">
+                <button onclick="playPrev()" class="text-white text-xl"><i class="fa-solid fa-backward-step"></i></button>
+                <button onclick="togglePlay()" class="ymusic-red text-white rounded-full w-14 h-14 flex items-center justify-center text-xl shadow-lg shadow-red-600/20 active:scale-95">
+                    <i id="np-play-icon" class="fa-solid fa-play"></i>
+                </button>
+                <button onclick="playNext()" class="text-white text-xl"><i class="fa-solid fa-forward-step"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- شريط التشغيل المصغر الثابت -->
+    <div id="mini-player" onclick="expandPlayer()" class="fixed bottom-16 left-2 right-2 bg-[#141414] border border-zinc-900 p-2 rounded-xl flex items-center justify-between hidden z-40 shadow-xl">
+        <div class="flex items-center space-x-3">
+            <img id="mini-img" src="" class="w-9 h-9 rounded-lg object-cover">
+            <div class="max-w-[160px]">
+                <h4 id="mini-title" class="text-white text-xs font-semibold truncate">Title</h4>
+                <p id="mini-artist" class="text-zinc-500 text-[10px] truncate">Artist</p>
+            </div>
+        </div>
+        <button onclick="event.stopPropagation(); togglePlay();" class="text-white pr-2"><i id="mini-play-icon" class="fa-solid fa-play text-base"></i></button>
+    </div>
+
+    <!-- ==================== شريط التنقل السفلي ==================== -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-[#0c0c0c] border-t border-zinc-900 h-14 flex justify-around items-center z-40">
+        <button onclick="switchScreen('search')" id="nav-search" class="flex flex-col items-center text-ymusic-red space-y-1">
+            <i class="fa-solid fa-magnifying-glass text-lg"></i>
+            <span class="text-[9px] font-semibold">Search</span>
+        </button>
+        <button onclick="switchScreen('favorites')" id="nav-favorites" class="flex flex-col items-center text-zinc-500 space-y-1">
+            <i class="fa-solid fa-heart text-lg"></i>
+            <span class="text-[9px] font-semibold">Favorites</span>
+        </button>
+        <button onclick="switchScreen('playlists')" id="nav-playlists" class="flex flex-col items-center text-zinc-500 space-y-1">
+            <i class="fa-solid fa-list-ul text-lg"></i>
+            <span class="text-[9px] font-semibold">Playlists</span>
+        </button>
+    </nav>
+
+    <!-- الـ Bottom Sheet لإضافة الأغاني -->
+    <div id="playlist-sheet" class="fixed inset-0 bg-black/60 z-50 hidden opacity-0 transition-opacity duration-300 flex items-end">
+        <div class="w-full bg-[#121212] rounded-t-2xl p-5 space-y-4 max-h-[50vh] overflow-y-auto transform translate-y-full transition-transform duration-300 border-t border-zinc-800">
+            <div class="flex justify-between items-center pb-2 border-b border-zinc-900">
+                <h3 class="text-sm font-bold text-white">Add to Playlist</h3>
+                <button onclick="closePlaylistSheet()" class="text-zinc-500 text-xs">Cancel</button>
+            </div>
+            <div id="sheet-playlists-list" class="space-y-2"></div>
+        </div>
+    </div>
+
+    <!-- مشغل يوتيوب الخلفي (جعله ظاهراً وحياً في الخلفية لحل مشاكل الحظر) -->
+    <div class="fixed top-2 right-2 z-50 w-24 h-16 rounded overflow-hidden opacity-5 bg-black pointer-events-none">
+        <div id="youtube-player"></div>
+    </div>
+    <script src="https://www.youtube.com/iframe_api"></script>
+
+    <script>
+        let currentQueue = [];
+        let currentTrackIndex = -1;
+        let player;
+        let progressInterval;
+        let isSeeking = false;
+        let favorites = JSON.parse(localStorage.getItem('ymusic_favs')) || [];
+        let playlists = JSON.parse(localStorage.getItem('ymusic_lists')) || { "التريند": [] };
+
+        // ألبوم أغاني عربي حقيقي وشغال فوراً
+        const sampleSongs = [
+            { id: "S_f6m8S_q_0", title: "بتمنى أنساك", artist: "Sherine", img: "https://img.youtube.com/vi/S_f6m8S_q_0/0.jpg" },
+            { id: "rtovZ-KiE6I", title: "البخت", artist: "Wegz", img: "https://img.youtube.com/vi/rtovZ-KiE6I/0.jpg" },
+            { id: "v18N_HkZ5_U", title: "تجي نعمل لغبطة", artist: "Amr Diab", img: "https://img.youtube.com/vi/v18N_HkZ5_U/0.jpg" },
+            { id: "7Eisv77uM_4", title: "مخاصماك", artist: "Nawal", img: "https://img.youtube.com/vi/7Eisv77uM_4/0.jpg" }
+        ];
+
+        function onYouTubeIframeAPIReady() {
+            player = new YT.Player('youtube-player', {
+                height: '100%', width: '100%', videoId: '',
+                playerVars: { 
+                    'controls': 0, 
+                    'playsinline': 1, 
+                    'rel': 0, 
+                    'disablekb': 1,
+                    'enablejsapi': 1,
+                    'origin': window.location.origin
+                },
+                events: { 'onStateChange': onPlayerStateChange, 'onReady': onPlayerReady }
+            });
+        }
+
+        function onPlayerReady() {
+            currentQueue = [...sampleSongs];
+            renderTrending(currentQueue);
+            renderFavorites();
+            renderPlaylists();
+        }
+
+        function onPlayerStateChange(event) {
+            if (event.data === YT.PlayerState.PLAYING) {
+                setPlayState(true);
+                startProgressUpdate();
+            } else {
+                setPlayState(false);
+                clearInterval(progressInterval);
+                if (event.data === YT.PlayerState.ENDED) playNext();
+            }
+        }
+
+        function renderTrending(songs) {
+            const container = document.getElementById('trending-list');
+            container.innerHTML = '';
+            songs.forEach((song, idx) => {
+                const isFav = favorites.some(f => f.id === song.id);
+                const item = document.createElement('div');
+                item.className = "flex items-center justify-between bg-[#0e0e0e] p-2 rounded-xl cursor-pointer";
+                item.onclick = () => { currentQueue = songs; currentTrackIndex = idx; playSong(song); };
+                item.innerHTML = `
+                    <div class="flex items-center space-x-3">
+                        <img src="${song.img}" class="w-12 h-12 object-cover rounded-xl">
+                        <div class="max-w-[160px] truncate"><h4 class="text-white font-semibold text-xs">${song.title}</h4><p class="text-[10px] text-zinc-500">${song.artist}</p></div>
+                    </div>
+                    <div class="flex items-center space-x-4 text-zinc-500 pr-1">
+                        <button onclick="event.stopPropagation(); toggleFavFromList('${song.id}')"><i class="${isFav?'fa-solid fa-heart text-red-500':'fa-regular fa-heart'}"></i></button>
+                        <button onclick="event.stopPropagation(); openPlaylistSheet('${song.id}')"><div class="w-5 h-5 rounded-full border border-zinc-500 flex items-center justify-center"><i class="fa-solid fa-plus text-[9px]"></i></div></button>
+                    </div>`;
+                container.appendChild(item);
+            });
+        }
+
+        function playSong(song) {
+            document.getElementById('mini-player').classList.remove('hidden');
+            ['mini', 'np'].forEach(prefix => {
+                document.getElementById(`${prefix}-title`).innerText = song.title;
+                document.getElementById(`${prefix}-artist`).innerText = song.artist;
+                document.getElementById(`${prefix}-img`).src = song.img;
+            });
+            player.loadVideoById(song.id);
+            updateFavIcon();
+        }
+
+        function togglePlay() {
+            if (!player || currentTrackIndex === -1) return;
+            player.getPlayerState() === YT.PlayerState.PLAYING ? player.pauseVideo() : player.playVideo();
+        }
+
+        function setPlayState(isPlaying) {
+            document.getElementById('mini-play-icon').className = isPlaying ? "fa-solid fa-pause text-base" : "fa-solid fa-play text-base";
+            document.getElementById('np-play-icon').className = isPlaying ? "fa-solid fa-pause" : "fa-solid fa-play";
+        }
+
+        function startProgressUpdate() {
+            clearInterval(progressInterval);
+            const bar = document.getElementById('progress-bar');
+            progressInterval = setInterval(() => {
+                if (player && player.getDuration && !isSeeking) {
+                    const current = player.getCurrentTime();
+                    const total = player.getDuration();
+                    if (total > 0) {
+                        bar.value = (current / total) * 100;
+                        document.getElementById('current-time').innerText = formatTime(current);
+                        document.getElementById('total-duration').innerText = formatTime(total);
+                    }
+                }
+            }, 500);
+        }
+
+        const progressBar = document.getElementById('progress-bar');
+        progressBar.addEventListener('mousedown', () => isSeeking = true);
+        progressBar.addEventListener('touchstart', () => isSeeking = true);
+        progressBar.addEventListener('input', (e) => {
+            if (player && player.getDuration) {
+                const time = (e.target.value / 100) * player.getDuration();
+                document.getElementById('current-time').innerText = formatTime(time);
+            }
+        });
+        progressBar.addEventListener('change', (e) => {
+            if (player && player.getDuration) {
+                const time = (e.target.value / 100) * player.getDuration();
+                player.seekTo(time, true);
+            }
+            isSeeking = false;
+        });
+
+        function formatTime(sec) {
+            if (isNaN(sec) || sec < 0) return "0:00";
+            let m = Math.floor(sec / 60); let s = Math.floor(sec % 60);
+            return `${m}:${s < 10 ? '0' : ''}${s}`;
+        }
+
+        function playNext() {
+            if (currentTrackIndex < currentQueue.length - 1) { currentTrackIndex++; playSong(currentQueue[currentTrackIndex]); }
+        }
+        function playPrev() {
+            if (currentTrackIndex > 0) { currentTrackIndex--; playSong(currentQueue[currentTrackIndex]); }
+        }
+
+        function switchScreen(screen) {
+            ['search', 'favorites', 'playlists', 'playlist-view'].forEach(s => document.getElementById(`screen-${s}`).classList.add('hidden'));
+            document.getElementById(`screen-${screen}`).classList.remove('hidden');
+            
+            ['search', 'favorites', 'playlists'].forEach(s => {
+                const btn = document.getElementById(`nav-${s}`);
+                if (s === screen || (screen === 'playlist-view' && s === 'playlists')) {
+                    btn.className = "flex flex-col items-center text-ymusic-red space-y-1";
+                } else {
+                    btn.className = "flex flex-col items-center text-zinc-500 space-y-1";
+                }
+            });
+        }
+        function expandPlayer() { document.getElementById('now-playing-screen').classList.remove('translate-y-full'); }
+        function minimizePlayer() { document.getElementById('now-playing-screen').classList.add('translate-y-full'); }
+
+        function toggleFavFromList(id) {
+            const song = sampleSongs.find(s => s.id === id) || favorites.find(s => s.id === id);
+            const idx = favorites.findIndex(f => f.id === id);
+            idx === -1 ? favorites.push(song) : favorites.splice(idx, 1);
+            saveAndRefresh();
+        }
+        function toggleFavoriteCurrent() { if(currentTrackIndex !== -1) toggleFavFromList(currentQueue[currentTrackIndex].id); }
+        function updateFavIcon() {
+            if(currentTrackIndex === -1) return;
+            const isFav = favorites.some(f => f.id === currentQueue[currentTrackIndex].id);
+            document.getElementById('np-fav-icon').className = isFav ? "fa-solid fa-heart text-red-500" : "fa-regular fa-heart";
+        }
+        function saveAndRefresh() {
+            localStorage.setItem('ymusic_favs', JSON.stringify(favorites));
+            localStorage.setItem('ymusic_lists', JSON.stringify(playlists));
+            renderTrending(sampleSongs); renderFavorites(); renderPlaylists(); updateFavIcon();
+        }
+        function renderFavorites() {
+            document.getElementById('fav-count').innerText = `${favorites.length} songs`;
+            const c = document.getElementById('favorites-list'); c.innerHTML = '';
+            favorites.forEach((s, i) => {
+                const item = document.createElement('div'); item.className = "flex items-center justify-between bg-[#0e0e0e] p-2 rounded-xl cursor-pointer";
+                item.onclick = () => { currentQueue = favorites; currentTrackIndex = i; playSong(s); };
+                item.innerHTML = `<div class="flex items-center space-x-3"><span class="text-zinc-500 text-[10px] w-4">${i+1}</span><img src="${s.img}" class="w-11 h-11 object-cover rounded-xl"><div><h4 class="text-white font-semibold text-xs">${s.title}</h4><p class="text-[10px] text-zinc-500">${s.artist}</p></div></div><button onclick="event.stopPropagation(); toggleFavFromList('${s.id}')"><i class="fa-regular fa-trash-can text-red-500"></i></button>`;
+                c.appendChild(item);
+            });
+        }
+        function playAllFavorites() { if(favorites.length > 0) { currentQueue = favorites; currentTrackIndex = 0; playSong(favorites[0]); } }
+        function createNewPlaylist() { const n = prompt("Name:"); if(n && !playlists[n]) { playlists[n] = []; saveAndRefresh(); } }
+        function renderPlaylists() {
+            const c = document.getElementById('playlists-list'); c.innerHTML = '';
+            Object.keys(playlists).forEach(n => {
+                const card = document.createElement('div'); card.className = "bg-[#0e0e0e] p-4 rounded-xl flex flex-col justify-between h-28 cursor-pointer";
+                card.onclick = () => viewPlaylist(n);
+                card.innerHTML = `<div class="flex justify-between text-ymusic-red"><i class="fa-solid fa-music"></i><button onclick="event.stopPropagation(); delete playlists['${n}']; saveAndRefresh();" class="text-zinc-600 text-xs"><i class="fa-solid fa-trash"></i></button></div><div><h3 class="text-white font-bold text-xs">${n}</h3><p class="text-[10px] text-zinc-500">${playlists[n].length} songs</p></div>`;
+                c.appendChild(card);
+            });
+        }
+        function viewPlaylist(n) {
+            switchScreen('playlist-view'); document.getElementById('playlist-view-title').innerText = n;
+            const c = document.getElementById('playlist-view-songs'); c.innerHTML = '';
+            playlists[n].forEach((s, i) => {
+                const item = document.createElement('div'); item.className = "flex items-center justify-between bg-[#0e0e0e] p-2 rounded-xl cursor-pointer";
+                item.onclick = () => { currentQueue = playlists[n]; currentTrackIndex = i; playSong(s); };
+                item.innerHTML = `<div class="flex items-center space-x-3"><span class="text-zinc-500 text-[10px] w-4">${i+1}</span><img src="${s.img}" class="w-11 h-11 object-cover rounded-xl"><div><h4 class="text-white font-semibold text-xs">${s.title}</h4><p class="text-[10px] text-zinc-500">${s.artist}</p></div></div><button onclick="event.stopPropagation(); playlists['${n}']=playlists['${n}'].filter(x=>x.id!='${s.id}'); saveAndRefresh(); viewPlaylist('${n}');"><i class="fa-regular fa-trash-can text-red-500"></i></button>`;
+                c.appendChild(item);
+            });
+        }
+        let songToAddToPlaylist = null;
+        function openPlaylistSheet(id) {
+            songToAddToPlaylist = sampleSongs.find(s => s.id === id) || favorites.find(s => s.id === id);
+            const sheet = document.getElementById('playlist-sheet'); const list = document.getElementById('sheet-playlists-list'); list.innerHTML = '';
+            Object.keys(playlists).forEach(n => {
+                const d = document.createElement('div'); d.className = "p-3 bg-[#1e1e1e] rounded-xl text-white text-xs text-right cursor-pointer";
+                d.innerText = n; d.onclick = () => { if(!playlists[n].some(x=>x.id===songToAddToPlaylist.id)) { playlists[n].push(songToAddToPlaylist); saveAndRefresh(); } closePlaylistSheet(); };
+                list.appendChild(d);
+            });
+            sheet.classList.remove('hidden'); setTimeout(() => { sheet.classList.remove('opacity-0'); sheet.querySelector('div').classList.remove('translate-y-full'); }, 50);
+        }
+        function closePlaylistSheet() { const s = document.getElementById('playlist-sheet'); s.querySelector('div').classList.add('translate-y-full'); s.classList.add('opacity-0'); setTimeout(() => s.classList.add('hidden'), 300); }
+
+        document.getElementById('search-input').addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            const filtered = sampleSongs.filter(s => s.title.toLowerCase().includes(query) || s.artist.toLowerCase().includes(query));
+            document.getElementById('list-title').innerText = query ? "Search Results" : "Trending";
+            renderTrending(filtered);
+        });
+    </script>
+</body>
+</html>
