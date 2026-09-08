@@ -682,6 +682,7 @@
         category: "All",
         query: "",
         view: "home",
+        activePlaylistId: null,
         player: null,
         playerReady: false,
         pendingId: null,
@@ -739,6 +740,10 @@
       function songCard(song) {
         const favorite = isFavorite(song.id);
         const playing = state.currentSong?.id === song.id;
+        const inPlaylist = state.view === "home" && state.activePlaylistId;
+        const playlistAction = inPlaylist
+          ? `<button class="icon-button" data-remove-playlist="${escapeHtml(state.activePlaylistId)}" data-remove-song="${escapeHtml(song.id)}" title="إزالة من قائمة التشغيل">−</button>`
+          : `<button class="icon-button" data-add-playlist="${escapeHtml(song.id)}" title="إضافة لقائمة">＋</button>`;
         return `
           <article class="song ${playing ? "playing" : ""}">
             <img class="cover" src="${escapeHtml(song.thumbnail || FALLBACK_THUMBNAIL)}" alt="" loading="lazy" />
@@ -748,7 +753,7 @@
             </div>
             <div class="song-actions">
               <button class="icon-button ${favorite ? "active" : ""}" data-favorite="${escapeHtml(song.id)}" title="المفضلة">${favorite ? "♥" : "♡"}</button>
-              <button class="icon-button" data-add-playlist="${escapeHtml(song.id)}" title="إضافة لقائمة">＋</button>
+              ${playlistAction}
             </div>
           </article>
         `;
@@ -784,6 +789,16 @@
           .forEach((button) => {
             button.addEventListener("click", () =>
               addSongToPlaylist(button.dataset.addPlaylist),
+            );
+          });
+        $("songs")
+          .querySelectorAll("[data-remove-playlist]")
+          .forEach((button) => {
+            button.addEventListener("click", () =>
+              removeSongFromPlaylist(
+                button.dataset.removePlaylist,
+                button.dataset.removeSong,
+              ),
             );
           });
       }
@@ -839,6 +854,7 @@
               );
               if (!playlist) return;
               state.songs = playlist.songs;
+              state.activePlaylistId = playlist.id;
               state.view = "home";
               showView("home");
               $("sectionTitle").textContent = playlist.name;
@@ -883,6 +899,17 @@
         if (!playlist.songs.some((item) => item.id === song.id))
           playlist.songs.push(song);
         savePlaylists(items);
+        renderPlaylists();
+      }
+
+      function removeSongFromPlaylist(playlistId, songId) {
+        const items = playlists();
+        const playlist = items.find((item) => item.id === playlistId);
+        if (!playlist) return;
+        playlist.songs = playlist.songs.filter((song) => song.id !== songId);
+        savePlaylists(items);
+        state.songs = playlist.songs;
+        renderSongs();
         renderPlaylists();
       }
 
@@ -1059,11 +1086,18 @@
       $("searchForm").addEventListener("submit", (event) => {
         event.preventDefault();
         state.query = $("searchInput").value.trim();
+        state.activePlaylistId = null;
         loadSongs(state.query, state.category);
       });
 
       document.querySelectorAll(".nav button").forEach((button) => {
-        button.addEventListener("click", () => showView(button.dataset.view));
+        button.addEventListener("click", () => {
+          if (button.dataset.view === "home" && state.activePlaylistId) {
+            state.activePlaylistId = null;
+            loadSongs(state.query, state.category);
+          }
+          showView(button.dataset.view);
+        });
       });
 
       document.querySelectorAll(".chip").forEach((button) => {
@@ -1074,6 +1108,7 @@
           button.classList.add("active");
           state.category = button.dataset.category;
           state.query = "";
+          state.activePlaylistId = null;
           $("searchInput").value = "";
           loadSongs("", state.category);
         });
