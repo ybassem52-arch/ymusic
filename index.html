@@ -442,7 +442,8 @@
       .progress {
         position: relative;
         flex: 1;
-        height: 5px;
+        height: 8px;
+        padding: 2px 0;
         border-radius: 99px;
         background: #363b46;
         cursor: pointer;
@@ -453,15 +454,18 @@
         height: 100%;
         border-radius: inherit;
         background: var(--red);
+        pointer-events: none;
       }
 
+      /* تعديل مشغل Iframe ليظل متوافقًا مع متطلبات المتصفح وبدون أن يظهر للعين */
       .hidden-player {
         position: fixed;
-        top: -10px;
-        left: -10px;
-        width: 1px;
-        height: 1px;
-        opacity: 0;
+        bottom: 0;
+        right: 0;
+        width: 200px;
+        height: 200px;
+        z-index: -10;
+        opacity: 0.01;
         pointer-events: none;
       }
 
@@ -683,6 +687,7 @@
         playerReady: false,
         pendingId: null,
         poller: null,
+        isSeeking: false,
       };
 
       const $ = (id) => document.getElementById(id);
@@ -919,25 +924,29 @@
       }
 
       function updateMediaSession() {
-        if ('mediaSession' in navigator && state.currentSong) {
+        if ("mediaSession" in navigator && state.currentSong) {
           navigator.mediaSession.metadata = new MediaMetadata({
             title: state.currentSong.title,
-            artist: state.currentSong.artist || 'YouTube',
+            artist: state.currentSong.artist || "YouTube",
             artwork: [
-              { src: state.currentSong.thumbnail || FALLBACK_THUMBNAIL, sizes: '512x512', type: 'image/jpeg' }
-            ]
+              {
+                src: state.currentSong.thumbnail || FALLBACK_THUMBNAIL,
+                sizes: "512x512",
+                type: "image/jpeg",
+              },
+            ],
           });
 
-          navigator.mediaSession.setActionHandler('play', () => {
+          navigator.mediaSession.setActionHandler("play", () => {
             if (state.player) state.player.playVideo();
           });
-          navigator.mediaSession.setActionHandler('pause', () => {
+          navigator.mediaSession.setActionHandler("pause", () => {
             if (state.player) state.player.pauseVideo();
           });
-          navigator.mediaSession.setActionHandler('previoustrack', () => {
+          navigator.mediaSession.setActionHandler("previoustrack", () => {
             playPrevious();
           });
-          navigator.mediaSession.setActionHandler('nexttrack', () => {
+          navigator.mediaSession.setActionHandler("nexttrack", () => {
             playNext();
           });
         }
@@ -953,8 +962,9 @@
         $("playButton").textContent = state.isPlaying ? "❚❚" : "▶";
         $("currentTime").textContent = formatTime(state.position);
         $("duration").textContent = formatTime(state.duration);
-        $("progressFill").style.width =
-          `${state.duration ? Math.min(100, (state.position / state.duration) * 100) : 0}%`;
+        if (!state.isSeeking) {
+          $("progressFill").style.width = `${state.duration ? Math.min(100, (state.position / state.duration) * 100) : 0}%`;
+        }
         updatePlayerFavorite();
       }
 
@@ -974,7 +984,7 @@
       function startPolling() {
         stopPolling();
         state.poller = setInterval(() => {
-          if (!state.player || !state.isPlaying) return;
+          if (!state.player || !state.isPlaying || state.isSeeking) return;
           try {
             state.position = state.player.getCurrentTime() || 0;
             state.duration = state.player.getDuration() || state.duration;
@@ -985,10 +995,10 @@
 
       function onYouTubeIframeAPIReady() {
         state.player = new YT.Player("hiddenPlayer", {
-          width: "1",
-          height: "1",
+          width: "200",
+          height: "200",
           playerVars: {
-            autoplay: 0,
+            autoplay: 1,
             controls: 0,
             disablekb: 1,
             fs: 0,
@@ -1007,13 +1017,13 @@
             onStateChange: (event) => {
               if (event.data === YT.PlayerState.PLAYING) {
                 state.isPlaying = true;
-                if ('mediaSession' in navigator) {
+                if ("mediaSession" in navigator) {
                   navigator.mediaSession.playbackState = "playing";
                 }
                 startPolling();
               } else if (event.data === YT.PlayerState.PAUSED) {
                 state.isPlaying = false;
-                if ('mediaSession' in navigator) {
+                if ("mediaSession" in navigator) {
                   navigator.mediaSession.playbackState = "paused";
                 }
                 stopPolling();
@@ -1053,7 +1063,8 @@
 
       function playNext() {
         if (!state.queue.length) return;
-        const next = state.queue[(state.currentIndex + 1) % state.queue.length];
+        const next =
+          state.queue[(state.currentIndex + 1) % state.queue.length];
         if (next) playSong(next, state.queue);
       }
 
@@ -1106,16 +1117,37 @@
       $("playerFavorite").addEventListener("click", () => {
         if (state.currentSong) toggleFavorite(state.currentSong);
       });
-      $("progress").addEventListener("click", (event) => {
+
+      // تحسين شريط التقدم ليدعم السحب بالتタッチ/الماوس (Drag / Seek)
+      const progressBar = $("progress");
+
+      function handleSeek(e) {
         if (!state.duration || !state.player) return;
-        const rect = event.currentTarget.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const rect = progressBar.getBoundingClientRect();
         const ratio = Math.max(
           0,
-          Math.min(1, (event.clientX - rect.left) / rect.width),
+          Math.min(1, (clientX - rect.left) / rect.width),
         );
-        state.player.seekTo(ratio * state.duration, true);
         state.position = ratio * state.duration;
-        updatePlayer();
+        $("progressFill").style.width = `${ratio * 100}%`;
+        $("currentTime").textContent = formatTime(state.position);
+      }
+
+      progressBar.addEventListener("pointerdown", (e) => {
+        state.isSeeking = true;
+        handleSeek(e);
+      });
+
+      window.addEventListener("pointermove", (e) => {
+        if (state.isSeeking) handleSeek(e);
+      });
+
+      window.addEventListener("pointerup", () => {
+        if (state.isSeeking) {
+          state.isSeeking = false;
+          if (state.player) state.player.seekTo(state.position, true);
+        }
       });
 
       window.__ymusicYoutubeReadyCallback = onYouTubeIframeAPIReady;
