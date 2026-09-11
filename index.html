@@ -668,25 +668,9 @@
     <div id="hiddenPlayer" class="hidden-player"></div>
 
     <script>
-      // إنشاء صوت صامت في الخلفية لإبقاء الخدمة حية في أندرويد
-const dummyAudio = new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=");
-dummyAudio.loop = true;
+      const API_BASE = "https://you-tube-music-stream--youssebasse.replit.app/api";
+      const FALLBACK_THUMBNAIL = "https://i.ytimg.com/vi/aqz-KE-bpKQ/hqdefault.jpg";
 
-// تشغيل الصوت الصامت فوراً عند الضغط على زر التشغيل
-function keepAliveInBackground() {
-  dummyAudio.play().catch(() => {});
-}
-
-// تعديل دالة التشغيل لتستدعي الصوت الصامت
-const originalPlaySong = playSong;
-playSong = function(song, queue = state.songs) {
-  keepAliveInBackground();
-  originalPlaySong(song, queue);
-};
-      const API_BASE =
-        "https://you-tube-music-stream--youssebasse.replit.app/api";
-      const FALLBACK_THUMBNAIL =
-        "https://i.ytimg.com/vi/aqz-KE-bpKQ/hqdefault.jpg";
       const state = {
         songs: [],
         queue: [],
@@ -706,14 +690,10 @@ playSong = function(song, queue = state.songs) {
       };
 
       const $ = (id) => document.getElementById(id);
-      const favorites = () =>
-        JSON.parse(localStorage.getItem("ymusic-favorites") || "[]");
-      const playlists = () =>
-        JSON.parse(localStorage.getItem("ymusic-playlists") || "[]");
-      const saveFavorites = (items) =>
-        localStorage.setItem("ymusic-favorites", JSON.stringify(items));
-      const savePlaylists = (items) =>
-        localStorage.setItem("ymusic-playlists", JSON.stringify(items));
+      const favorites = () => JSON.parse(localStorage.getItem("ymusic-favorites") || "[]");
+      const playlists = () => JSON.parse(localStorage.getItem("ymusic-playlists") || "[]");
+      const saveFavorites = (items) => localStorage.setItem("ymusic-favorites", JSON.stringify(items));
+      const savePlaylists = (items) => localStorage.setItem("ymusic-playlists", JSON.stringify(items));
 
       function escapeHtml(value) {
         return String(value ?? "").replace(
@@ -780,41 +760,30 @@ playSong = function(song, queue = state.songs) {
         $("songs").innerHTML = songs.length
           ? songs.map(songCard).join("")
           : '<div class="empty">لم نجد أغاني. جرّب كلمة بحث أخرى.</div>';
-        $("songCount").textContent = songs.length
-          ? `${songs.length} نتيجة`
-          : "";
+        $("songCount").textContent = songs.length ? `${songs.length} نتيجة` : "";
         $("songs")
           .querySelectorAll("[data-play]")
           .forEach((button) => {
-            button.addEventListener("click", () =>
-              playSongById(button.dataset.play),
-            );
+            button.addEventListener("click", () => playSongById(button.dataset.play));
           });
         $("songs")
           .querySelectorAll("[data-favorite]")
           .forEach((button) => {
             button.addEventListener("click", () => {
-              const song = state.songs.find(
-                (item) => item.id === button.dataset.favorite,
-              );
+              const song = state.songs.find((item) => item.id === button.dataset.favorite);
               if (song) toggleFavorite(song);
             });
           });
         $("songs")
           .querySelectorAll("[data-add-playlist]")
           .forEach((button) => {
-            button.addEventListener("click", () =>
-              addSongToPlaylist(button.dataset.addPlaylist),
-            );
+            button.addEventListener("click", () => addSongToPlaylist(button.dataset.addPlaylist));
           });
         $("songs")
           .querySelectorAll("[data-remove-playlist]")
           .forEach((button) => {
             button.addEventListener("click", () =>
-              removeSongFromPlaylist(
-                button.dataset.removePlaylist,
-                button.dataset.removeSong,
-              ),
+              removeSongFromPlaylist(button.dataset.removePlaylist, button.dataset.removeSong)
             );
           });
       }
@@ -828,9 +797,7 @@ playSong = function(song, queue = state.songs) {
           .querySelectorAll("[data-play]")
           .forEach((button) => {
             button.addEventListener("click", () => {
-              const song = items.find(
-                (item) => item.id === button.dataset.play,
-              );
+              const song = items.find((item) => item.id === button.dataset.play);
               if (song) playSong(song, items);
             });
           });
@@ -838,9 +805,7 @@ playSong = function(song, queue = state.songs) {
           .querySelectorAll("[data-favorite]")
           .forEach((button) => {
             button.addEventListener("click", () => {
-              const song = items.find(
-                (item) => item.id === button.dataset.favorite,
-              );
+              const song = items.find((item) => item.id === button.dataset.favorite);
               if (song) toggleFavorite(song);
             });
           });
@@ -857,7 +822,7 @@ playSong = function(song, queue = state.songs) {
                 <p>${playlist.songs.length} أغنية محفوظة</p>
                 <button class="secondary-button" data-open-playlist="${escapeHtml(playlist.id)}">فتح القائمة</button>
               </article>
-            `,
+            `
               )
               .join("")
           : '<div class="empty">أنشئ أول قائمة تشغيل لك.</div>';
@@ -865,9 +830,7 @@ playSong = function(song, queue = state.songs) {
           .querySelectorAll("[data-open-playlist]")
           .forEach((button) => {
             button.addEventListener("click", () => {
-              const playlist = items.find(
-                (item) => item.id === button.dataset.openPlaylist,
-              );
+              const playlist = items.find((item) => item.id === button.dataset.openPlaylist);
               if (!playlist) return;
               state.songs = playlist.songs;
               state.activePlaylistId = playlist.id;
@@ -902,18 +865,15 @@ playSong = function(song, queue = state.songs) {
           return;
         }
         const name = prompt(
-          `اكتب اسم القائمة لإضافة الأغنية إليها:\n${items.map((item) => item.name).join("، ")}`,
+          `اكتب اسم القائمة لإضافة الأغنية إليها:\n${items.map((item) => item.name).join("، ")}`
         );
         if (!name) return;
-        const playlist = items.find(
-          (item) => item.name.toLowerCase() === name.trim().toLowerCase(),
-        );
+        const playlist = items.find((item) => item.name.toLowerCase() === name.trim().toLowerCase());
         if (!playlist || !song) {
           alert("لم يتم العثور على القائمة. اكتب اسمها كما هو ظاهر.");
           return;
         }
-        if (!playlist.songs.some((item) => item.id === song.id))
-          playlist.songs.push(song);
+        if (!playlist.songs.some((item) => item.id === song.id)) playlist.songs.push(song);
         savePlaylists(items);
         renderPlaylists();
       }
@@ -957,12 +917,9 @@ playSong = function(song, queue = state.songs) {
 
       async function loadSongs(query = "", category = "All") {
         $("songs").innerHTML = '<div class="loading">جارٍ تحميل الأغاني</div>';
-        $("sectionTitle").textContent =
-          query || category !== "All" ? "نتائج البحث" : "Trending";
+        $("sectionTitle").textContent = query || category !== "All" ? "نتائج البحث" : "Trending";
         const params = query || (category !== "All" ? `${category} music` : "");
-        const endpoint = params
-          ? `/music/search?q=${encodeURIComponent(params)}`
-          : "/music/trending";
+        const endpoint = params ? `/music/search?q=${encodeURIComponent(params)}` : "/music/trending";
         try {
           const response = await fetch(API_BASE + endpoint);
           if (!response.ok) throw new Error("API error");
@@ -970,8 +927,7 @@ playSong = function(song, queue = state.songs) {
           state.songs = Array.isArray(data.songs) ? data.songs : [];
         } catch {
           state.songs = [];
-          $("songs").innerHTML =
-            '<div class="empty">تعذر الاتصال بالخادم. تأكد أن رابط Replit منشور ثم أعد المحاولة.</div>';
+          $("songs").innerHTML = '<div class="empty">تعذر الاتصال بالخادم. أعد المحاولة.</div>';
           return;
         }
         renderSongs();
@@ -987,8 +943,8 @@ playSong = function(song, queue = state.songs) {
         $("playButton").textContent = state.isPlaying ? "❚❚" : "▶";
         $("currentTime").textContent = formatTime(state.position);
         $("duration").textContent = formatTime(state.duration);
-        $("progressFill").style.width =
-          `${state.duration ? Math.min(100, (state.position / state.duration) * 100) : 0}%`;
+        $("progressFill").style.width = `${state.duration ? Math.min(100, (state.position / state.duration) * 100) : 0}%`;
+        
         updatePlayerFavorite();
         updateMediaSessionState();
       }
@@ -999,20 +955,16 @@ playSong = function(song, queue = state.songs) {
         $("playerFavorite").classList.toggle("active", !!active);
       }
 
-      /* ===== إضافة ميزة شاشة القفل والتحكم في الخلفية (Media Session API) ===== */
+      /* ===== Media Session API Control ===== */
       function setupMediaSession() {
         if (!("mediaSession" in navigator)) return;
 
         navigator.mediaSession.setActionHandler("play", () => {
-          if (state.player && !state.isPlaying) {
-            state.player.playVideo();
-          }
+          if (state.player) state.player.playVideo();
         });
 
         navigator.mediaSession.setActionHandler("pause", () => {
-          if (state.player && state.isPlaying) {
-            state.player.pauseVideo();
-          }
+          if (state.player) state.player.pauseVideo();
         });
 
         navigator.mediaSession.setActionHandler("previoustrack", () => {
@@ -1025,7 +977,7 @@ playSong = function(song, queue = state.songs) {
 
         try {
           navigator.mediaSession.setActionHandler("seekto", (details) => {
-            if (details.seekTime && state.player) {
+            if (details.seekTime !== undefined && state.player) {
               state.player.seekTo(details.seekTime, true);
               state.position = details.seekTime;
               updatePlayer();
@@ -1042,7 +994,7 @@ playSong = function(song, queue = state.songs) {
         navigator.mediaSession.metadata = new MediaMetadata({
           title: song.title || "ymusic",
           artist: song.artist || "YouTube",
-          album: "ymusic Player",
+          album: "ymusic",
           artwork: [
             { src: artworkUrl, sizes: "96x96", type: "image/jpeg" },
             { src: artworkUrl, sizes: "128x128", type: "image/jpeg" },
@@ -1055,11 +1007,9 @@ playSong = function(song, queue = state.songs) {
       function updateMediaSessionState() {
         if (!("mediaSession" in navigator)) return;
 
-        navigator.mediaSession.playbackState = state.isPlaying
-          ? "playing"
-          : "paused";
+        navigator.mediaSession.playbackState = state.isPlaying ? "playing" : "paused";
 
-        if (state.duration && "setPositionState" in navigator.mediaSession) {
+        if (state.duration > 0 && "setPositionState" in navigator.mediaSession) {
           try {
             navigator.mediaSession.setPositionState({
               duration: state.duration,
@@ -1094,7 +1044,7 @@ playSong = function(song, queue = state.songs) {
           width: "1",
           height: "1",
           playerVars: {
-            autoplay: 0,
+            autoplay: 1,
             controls: 0,
             disablekb: 1,
             fs: 0,
@@ -1140,12 +1090,15 @@ playSong = function(song, queue = state.songs) {
         state.position = 0;
         state.duration = 0;
         state.isPlaying = true;
-        
+
         updateMediaSessionMetadata(song);
         updatePlayer();
 
-        if (state.playerReady) state.player.loadVideoById(song.id);
-        else state.pendingId = song.id;
+        if (state.playerReady) {
+          state.player.loadVideoById(song.id);
+        } else {
+          state.pendingId = song.id;
+        }
       }
 
       function playSongById(id) {
@@ -1155,22 +1108,21 @@ playSong = function(song, queue = state.songs) {
 
       function playNext() {
         if (!state.queue.length) return;
-        const next = state.queue[(state.currentIndex + 1) % state.queue.length];
+        const nextIndex = (state.currentIndex + 1) % state.queue.length;
+        const next = state.queue[nextIndex];
         if (next) playSong(next, state.queue);
       }
 
       function playPrevious() {
         if (!state.queue.length) return;
-        if (state.position > 3) {
-          state.player?.seekTo(0, true);
+        if (state.position > 3 && state.player) {
+          state.player.seekTo(0, true);
           state.position = 0;
           updatePlayer();
           return;
         }
-        const previous =
-          state.queue[
-            (state.currentIndex - 1 + state.queue.length) % state.queue.length
-          ];
+        const prevIndex = (state.currentIndex - 1 + state.queue.length) % state.queue.length;
+        const previous = state.queue[prevIndex];
         if (previous) playSong(previous, state.queue);
       }
 
@@ -1193,9 +1145,7 @@ playSong = function(song, queue = state.songs) {
 
       document.querySelectorAll(".chip").forEach((button) => {
         button.addEventListener("click", () => {
-          document
-            .querySelectorAll(".chip")
-            .forEach((item) => item.classList.remove("active"));
+          document.querySelectorAll(".chip").forEach((item) => item.classList.remove("active"));
           button.classList.add("active");
           state.category = button.dataset.category;
           state.query = "";
@@ -1206,11 +1156,16 @@ playSong = function(song, queue = state.songs) {
       });
 
       $("newPlaylist").addEventListener("click", createPlaylist);
+
       $("playButton").addEventListener("click", () => {
         if (!state.player || !state.currentSong) return;
-        if (state.isPlaying) state.player.pauseVideo();
-        else state.player.playVideo();
+        if (state.isPlaying) {
+          state.player.pauseVideo();
+        } else {
+          state.player.playVideo();
+        }
       });
+
       $("nextButton").addEventListener("click", playNext);
       $("previousButton").addEventListener("click", playPrevious);
       $("playerPlaylist").addEventListener("click", () => {
@@ -1222,10 +1177,7 @@ playSong = function(song, queue = state.songs) {
       $("progress").addEventListener("click", (event) => {
         if (!state.duration || !state.player) return;
         const rect = event.currentTarget.getBoundingClientRect();
-        const ratio = Math.max(
-          0,
-          Math.min(1, (event.clientX - rect.left) / rect.width),
-        );
+        const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
         state.player.seekTo(ratio * state.duration, true);
         state.position = ratio * state.duration;
         updatePlayer();
