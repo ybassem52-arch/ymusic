@@ -442,8 +442,7 @@
       .progress {
         position: relative;
         flex: 1;
-        height: 8px;
-        padding: 2px 0;
+        height: 5px;
         border-radius: 99px;
         background: #363b46;
         cursor: pointer;
@@ -454,18 +453,15 @@
         height: 100%;
         border-radius: inherit;
         background: var(--red);
-        pointer-events: none;
       }
 
-      /* تعديل مشغل Iframe ليظل متوافقًا مع متطلبات المتصفح وبدون أن يظهر للعين */
       .hidden-player {
         position: fixed;
-        bottom: 0;
-        right: 0;
-        width: 200px;
-        height: 200px;
-        z-index: -10;
-        opacity: 0.01;
+        top: -10px;
+        left: -10px;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
         pointer-events: none;
       }
 
@@ -652,6 +648,9 @@
           ▶
         </button>
         <button class="icon-button" id="nextButton" title="التالي">⏭</button>
+        <button class="icon-button" id="playerPlaylist" title="إضافة إلى قائمة التشغيل">
+          ＋
+        </button>
         <button class="icon-button" id="playerFavorite" title="المفضلة">
           ♡
         </button>
@@ -683,11 +682,11 @@
         category: "All",
         query: "",
         view: "home",
+        activePlaylistId: null,
         player: null,
         playerReady: false,
         pendingId: null,
         poller: null,
-        isSeeking: false,
       };
 
       const $ = (id) => document.getElementById(id);
@@ -741,6 +740,10 @@
       function songCard(song) {
         const favorite = isFavorite(song.id);
         const playing = state.currentSong?.id === song.id;
+        const inPlaylist = state.view === "home" && state.activePlaylistId;
+        const playlistAction = inPlaylist
+          ? `<button class="icon-button" data-remove-playlist="${escapeHtml(state.activePlaylistId)}" data-remove-song="${escapeHtml(song.id)}" title="إزالة من قائمة التشغيل">−</button>`
+          : `<button class="icon-button" data-add-playlist="${escapeHtml(song.id)}" title="إضافة لقائمة">＋</button>`;
         return `
           <article class="song ${playing ? "playing" : ""}">
             <img class="cover" src="${escapeHtml(song.thumbnail || FALLBACK_THUMBNAIL)}" alt="" loading="lazy" />
@@ -750,7 +753,7 @@
             </div>
             <div class="song-actions">
               <button class="icon-button ${favorite ? "active" : ""}" data-favorite="${escapeHtml(song.id)}" title="المفضلة">${favorite ? "♥" : "♡"}</button>
-              <button class="icon-button" data-add-playlist="${escapeHtml(song.id)}" title="إضافة لقائمة">＋</button>
+              ${playlistAction}
             </div>
           </article>
         `;
@@ -786,6 +789,16 @@
           .forEach((button) => {
             button.addEventListener("click", () =>
               addSongToPlaylist(button.dataset.addPlaylist),
+            );
+          });
+        $("songs")
+          .querySelectorAll("[data-remove-playlist]")
+          .forEach((button) => {
+            button.addEventListener("click", () =>
+              removeSongFromPlaylist(
+                button.dataset.removePlaylist,
+                button.dataset.removeSong,
+              ),
             );
           });
       }
@@ -841,6 +854,7 @@
               );
               if (!playlist) return;
               state.songs = playlist.songs;
+              state.activePlaylistId = playlist.id;
               state.view = "home";
               showView("home");
               $("sectionTitle").textContent = playlist.name;
@@ -851,8 +865,24 @@
 
       function addSongToPlaylist(id) {
         const items = playlists();
+        const song =
+          state.currentSong?.id === id
+            ? state.currentSong
+            : state.songs.find((item) => item.id === id) ||
+              favorites().find((item) => item.id === id);
+        if (!song) return;
+
         if (!items.length) {
-          createPlaylist();
+          const name = prompt("لا توجد قائمة بعد. اكتب اسم أول قائمة تشغيل:");
+          if (!name?.trim()) return;
+          items.unshift({
+            id: Date.now().toString(36),
+            name: name.trim(),
+            songs: [song],
+          });
+          savePlaylists(items);
+          renderPlaylists();
+          alert(`تمت إضافة الأغنية إلى قائمة «${name.trim()}»`);
           return;
         }
         const name = prompt(
@@ -862,9 +892,6 @@
         const playlist = items.find(
           (item) => item.name.toLowerCase() === name.trim().toLowerCase(),
         );
-        const song =
-          state.songs.find((item) => item.id === id) ||
-          favorites().find((item) => item.id === id);
         if (!playlist || !song) {
           alert("لم يتم العثور على القائمة. اكتب اسمها كما هو ظاهر.");
           return;
@@ -872,6 +899,17 @@
         if (!playlist.songs.some((item) => item.id === song.id))
           playlist.songs.push(song);
         savePlaylists(items);
+        renderPlaylists();
+      }
+
+      function removeSongFromPlaylist(playlistId, songId) {
+        const items = playlists();
+        const playlist = items.find((item) => item.id === playlistId);
+        if (!playlist) return;
+        playlist.songs = playlist.songs.filter((song) => song.id !== songId);
+        savePlaylists(items);
+        state.songs = playlist.songs;
+        renderSongs();
         renderPlaylists();
       }
 
@@ -923,35 +961,6 @@
         renderSongs();
       }
 
-      function updateMediaSession() {
-        if ("mediaSession" in navigator && state.currentSong) {
-          navigator.mediaSession.metadata = new MediaMetadata({
-            title: state.currentSong.title,
-            artist: state.currentSong.artist || "YouTube",
-            artwork: [
-              {
-                src: state.currentSong.thumbnail || FALLBACK_THUMBNAIL,
-                sizes: "512x512",
-                type: "image/jpeg",
-              },
-            ],
-          });
-
-          navigator.mediaSession.setActionHandler("play", () => {
-            if (state.player) state.player.playVideo();
-          });
-          navigator.mediaSession.setActionHandler("pause", () => {
-            if (state.player) state.player.pauseVideo();
-          });
-          navigator.mediaSession.setActionHandler("previoustrack", () => {
-            playPrevious();
-          });
-          navigator.mediaSession.setActionHandler("nexttrack", () => {
-            playNext();
-          });
-        }
-      }
-
       function updatePlayer() {
         const song = state.currentSong;
         $("playerDock").hidden = !song;
@@ -962,16 +971,87 @@
         $("playButton").textContent = state.isPlaying ? "❚❚" : "▶";
         $("currentTime").textContent = formatTime(state.position);
         $("duration").textContent = formatTime(state.duration);
-        if (!state.isSeeking) {
-          $("progressFill").style.width = `${state.duration ? Math.min(100, (state.position / state.duration) * 100) : 0}%`;
-        }
+        $("progressFill").style.width =
+          `${state.duration ? Math.min(100, (state.position / state.duration) * 100) : 0}%`;
         updatePlayerFavorite();
+        updateMediaSessionState();
       }
 
       function updatePlayerFavorite() {
         const active = state.currentSong && isFavorite(state.currentSong.id);
         $("playerFavorite").textContent = active ? "♥" : "♡";
         $("playerFavorite").classList.toggle("active", !!active);
+      }
+
+      /* ===== إضافة ميزة شاشة القفل والتحكم في الخلفية (Media Session API) ===== */
+      function setupMediaSession() {
+        if (!("mediaSession" in navigator)) return;
+
+        navigator.mediaSession.setActionHandler("play", () => {
+          if (state.player && !state.isPlaying) {
+            state.player.playVideo();
+          }
+        });
+
+        navigator.mediaSession.setActionHandler("pause", () => {
+          if (state.player && state.isPlaying) {
+            state.player.pauseVideo();
+          }
+        });
+
+        navigator.mediaSession.setActionHandler("previoustrack", () => {
+          playPrevious();
+        });
+
+        navigator.mediaSession.setActionHandler("nexttrack", () => {
+          playNext();
+        });
+
+        try {
+          navigator.mediaSession.setActionHandler("seekto", (details) => {
+            if (details.seekTime && state.player) {
+              state.player.seekTo(details.seekTime, true);
+              state.position = details.seekTime;
+              updatePlayer();
+            }
+          });
+        } catch (e) {}
+      }
+
+      function updateMediaSessionMetadata(song) {
+        if (!("mediaSession" in navigator) || !song) return;
+
+        const artworkUrl = song.thumbnail || FALLBACK_THUMBNAIL;
+
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: song.title || "ymusic",
+          artist: song.artist || "YouTube",
+          album: "ymusic Player",
+          artwork: [
+            { src: artworkUrl, sizes: "96x96", type: "image/jpeg" },
+            { src: artworkUrl, sizes: "128x128", type: "image/jpeg" },
+            { src: artworkUrl, sizes: "192x192", type: "image/jpeg" },
+            { src: artworkUrl, sizes: "512x512", type: "image/jpeg" },
+          ],
+        });
+      }
+
+      function updateMediaSessionState() {
+        if (!("mediaSession" in navigator)) return;
+
+        navigator.mediaSession.playbackState = state.isPlaying
+          ? "playing"
+          : "paused";
+
+        if (state.duration && "setPositionState" in navigator.mediaSession) {
+          try {
+            navigator.mediaSession.setPositionState({
+              duration: state.duration,
+              playbackRate: 1,
+              position: Math.min(state.position, state.duration),
+            });
+          } catch (e) {}
+        }
       }
 
       function stopPolling() {
@@ -984,7 +1064,7 @@
       function startPolling() {
         stopPolling();
         state.poller = setInterval(() => {
-          if (!state.player || !state.isPlaying || state.isSeeking) return;
+          if (!state.player || !state.isPlaying) return;
           try {
             state.position = state.player.getCurrentTime() || 0;
             state.duration = state.player.getDuration() || state.duration;
@@ -995,10 +1075,10 @@
 
       function onYouTubeIframeAPIReady() {
         state.player = new YT.Player("hiddenPlayer", {
-          width: "200",
-          height: "200",
+          width: "1",
+          height: "1",
           playerVars: {
-            autoplay: 1,
+            autoplay: 0,
             controls: 0,
             disablekb: 1,
             fs: 0,
@@ -1017,15 +1097,9 @@
             onStateChange: (event) => {
               if (event.data === YT.PlayerState.PLAYING) {
                 state.isPlaying = true;
-                if ("mediaSession" in navigator) {
-                  navigator.mediaSession.playbackState = "playing";
-                }
                 startPolling();
               } else if (event.data === YT.PlayerState.PAUSED) {
                 state.isPlaying = false;
-                if ("mediaSession" in navigator) {
-                  navigator.mediaSession.playbackState = "paused";
-                }
                 stopPolling();
               } else if (event.data === YT.PlayerState.ENDED) {
                 state.isPlaying = false;
@@ -1050,8 +1124,10 @@
         state.position = 0;
         state.duration = 0;
         state.isPlaying = true;
+        
+        updateMediaSessionMetadata(song);
         updatePlayer();
-        updateMediaSession();
+
         if (state.playerReady) state.player.loadVideoById(song.id);
         else state.pendingId = song.id;
       }
@@ -1063,8 +1139,7 @@
 
       function playNext() {
         if (!state.queue.length) return;
-        const next =
-          state.queue[(state.currentIndex + 1) % state.queue.length];
+        const next = state.queue[(state.currentIndex + 1) % state.queue.length];
         if (next) playSong(next, state.queue);
       }
 
@@ -1086,11 +1161,18 @@
       $("searchForm").addEventListener("submit", (event) => {
         event.preventDefault();
         state.query = $("searchInput").value.trim();
+        state.activePlaylistId = null;
         loadSongs(state.query, state.category);
       });
 
       document.querySelectorAll(".nav button").forEach((button) => {
-        button.addEventListener("click", () => showView(button.dataset.view));
+        button.addEventListener("click", () => {
+          if (button.dataset.view === "home" && state.activePlaylistId) {
+            state.activePlaylistId = null;
+            loadSongs(state.query, state.category);
+          }
+          showView(button.dataset.view);
+        });
       });
 
       document.querySelectorAll(".chip").forEach((button) => {
@@ -1101,6 +1183,7 @@
           button.classList.add("active");
           state.category = button.dataset.category;
           state.query = "";
+          state.activePlaylistId = null;
           $("searchInput").value = "";
           loadSongs("", state.category);
         });
@@ -1114,44 +1197,28 @@
       });
       $("nextButton").addEventListener("click", playNext);
       $("previousButton").addEventListener("click", playPrevious);
+      $("playerPlaylist").addEventListener("click", () => {
+        if (state.currentSong) addSongToPlaylist(state.currentSong.id);
+      });
       $("playerFavorite").addEventListener("click", () => {
         if (state.currentSong) toggleFavorite(state.currentSong);
       });
-
-      // تحسين شريط التقدم ليدعم السحب بالتタッチ/الماوس (Drag / Seek)
-      const progressBar = $("progress");
-
-      function handleSeek(e) {
+      $("progress").addEventListener("click", (event) => {
         if (!state.duration || !state.player) return;
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const rect = progressBar.getBoundingClientRect();
+        const rect = event.currentTarget.getBoundingClientRect();
         const ratio = Math.max(
           0,
-          Math.min(1, (clientX - rect.left) / rect.width),
+          Math.min(1, (event.clientX - rect.left) / rect.width),
         );
+        state.player.seekTo(ratio * state.duration, true);
         state.position = ratio * state.duration;
-        $("progressFill").style.width = `${ratio * 100}%`;
-        $("currentTime").textContent = formatTime(state.position);
-      }
-
-      progressBar.addEventListener("pointerdown", (e) => {
-        state.isSeeking = true;
-        handleSeek(e);
-      });
-
-      window.addEventListener("pointermove", (e) => {
-        if (state.isSeeking) handleSeek(e);
-      });
-
-      window.addEventListener("pointerup", () => {
-        if (state.isSeeking) {
-          state.isSeeking = false;
-          if (state.player) state.player.seekTo(state.position, true);
-        }
+        updatePlayer();
       });
 
       window.__ymusicYoutubeReadyCallback = onYouTubeIframeAPIReady;
       if (window.__ymusicYoutubeApiReady) onYouTubeIframeAPIReady();
+
+      setupMediaSession();
       renderFavorites();
       renderPlaylists();
       loadSongs();
