@@ -687,6 +687,7 @@
         playerReady: false,
         pendingId: null,
         poller: null,
+        audioCtx: null
       };
 
       const $ = (id) => document.getElementById(id);
@@ -694,6 +695,25 @@
       const playlists = () => JSON.parse(localStorage.getItem("ymusic-playlists") || "[]");
       const saveFavorites = (items) => localStorage.setItem("ymusic-favorites", JSON.stringify(items));
       const savePlaylists = (items) => localStorage.setItem("ymusic-playlists", JSON.stringify(items));
+
+      // إنشاء صوت صامت عبر Web Audio API لمنع النظام من تجميد الصفحة في الخلفية
+      function keepAudioAlive() {
+        if (!state.audioCtx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) {
+            state.audioCtx = new AudioContext();
+            const osc = state.audioCtx.createOscillator();
+            const gain = state.audioCtx.createGain();
+            gain.gain.value = 0.001; // صوت شبه معدوم
+            osc.connect(gain);
+            gain.connect(state.audioCtx.destination);
+            osc.start();
+          }
+        }
+        if (state.audioCtx && state.audioCtx.state === "suspended") {
+          state.audioCtx.resume();
+        }
+      }
 
       function escapeHtml(value) {
         return String(value ?? "").replace(
@@ -960,6 +980,7 @@
         if (!("mediaSession" in navigator)) return;
 
         navigator.mediaSession.setActionHandler("play", () => {
+          keepAudioAlive();
           if (state.player) state.player.playVideo();
         });
 
@@ -1063,6 +1084,7 @@
             onStateChange: (event) => {
               if (event.data === YT.PlayerState.PLAYING) {
                 state.isPlaying = true;
+                keepAudioAlive();
                 startPolling();
               } else if (event.data === YT.PlayerState.PAUSED) {
                 state.isPlaying = false;
@@ -1084,6 +1106,7 @@
       }
 
       function playSong(song, queue = state.songs) {
+        keepAudioAlive();
         state.currentSong = song;
         state.queue = queue;
         state.currentIndex = queue.findIndex((item) => item.id === song.id);
@@ -1159,6 +1182,7 @@
 
       $("playButton").addEventListener("click", () => {
         if (!state.player || !state.currentSong) return;
+        keepAudioAlive();
         if (state.isPlaying) {
           state.player.pauseVideo();
         } else {
