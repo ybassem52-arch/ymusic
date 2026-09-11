@@ -390,7 +390,7 @@
       .player-song img {
         width: 45px;
         height: 45px;
-        border-radius: 9px;
+        border-radius: 99px;
         object-fit: cover;
       }
 
@@ -550,6 +550,11 @@
     </style>
   </head>
   <body>
+    <!-- عنصر صوت خفي صامت لجبر المتصفح على الاستمرار في الخلفية -->
+    <audio id="backgroundKeepAlive" loop style="display:none;">
+      <source src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=" type="audio/wav">
+    </audio>
+
     <main class="shell">
       <header class="topbar">
         <div class="topbar-copy">
@@ -686,8 +691,7 @@
         player: null,
         playerReady: false,
         pendingId: null,
-        poller: null,
-        audioCtx: null
+        poller: null
       };
 
       const $ = (id) => document.getElementById(id);
@@ -696,22 +700,18 @@
       const saveFavorites = (items) => localStorage.setItem("ymusic-favorites", JSON.stringify(items));
       const savePlaylists = (items) => localStorage.setItem("ymusic-playlists", JSON.stringify(items));
 
-      // إنشاء صوت صامت عبر Web Audio API لمنع النظام من تجميد الصفحة في الخلفية
-      function keepAudioAlive() {
-        if (!state.audioCtx) {
-          const AudioContext = window.AudioContext || window.webkitAudioContext;
-          if (AudioContext) {
-            state.audioCtx = new AudioContext();
-            const osc = state.audioCtx.createOscillator();
-            const gain = state.audioCtx.createGain();
-            gain.gain.value = 0.001; // صوت شبه معدوم
-            osc.connect(gain);
-            gain.connect(state.audioCtx.destination);
-            osc.start();
-          }
+      // تشغيل ملف HTML5 Audio صامت للحفاظ على جلسة الصوت نشطة بالأندرويد
+      function triggerBackgroundAudio() {
+        const bgAudio = $("backgroundKeepAlive");
+        if (bgAudio) {
+          bgAudio.play().catch(() => {});
         }
-        if (state.audioCtx && state.audioCtx.state === "suspended") {
-          state.audioCtx.resume();
+      }
+
+      function stopBackgroundAudio() {
+        const bgAudio = $("backgroundKeepAlive");
+        if (bgAudio) {
+          bgAudio.pause();
         }
       }
 
@@ -975,16 +975,16 @@
         $("playerFavorite").classList.toggle("active", !!active);
       }
 
-      /* ===== Media Session API Control ===== */
       function setupMediaSession() {
         if (!("mediaSession" in navigator)) return;
 
         navigator.mediaSession.setActionHandler("play", () => {
-          keepAudioAlive();
+          triggerBackgroundAudio();
           if (state.player) state.player.playVideo();
         });
 
         navigator.mediaSession.setActionHandler("pause", () => {
+          stopBackgroundAudio();
           if (state.player) state.player.pauseVideo();
         });
 
@@ -1084,10 +1084,11 @@
             onStateChange: (event) => {
               if (event.data === YT.PlayerState.PLAYING) {
                 state.isPlaying = true;
-                keepAudioAlive();
+                triggerBackgroundAudio();
                 startPolling();
               } else if (event.data === YT.PlayerState.PAUSED) {
                 state.isPlaying = false;
+                stopBackgroundAudio();
                 stopPolling();
               } else if (event.data === YT.PlayerState.ENDED) {
                 state.isPlaying = false;
@@ -1098,6 +1099,7 @@
             },
             onError: () => {
               state.isPlaying = false;
+              stopBackgroundAudio();
               stopPolling();
               updatePlayer();
             },
@@ -1106,7 +1108,7 @@
       }
 
       function playSong(song, queue = state.songs) {
-        keepAudioAlive();
+        triggerBackgroundAudio();
         state.currentSong = song;
         state.queue = queue;
         state.currentIndex = queue.findIndex((item) => item.id === song.id);
@@ -1182,11 +1184,12 @@
 
       $("playButton").addEventListener("click", () => {
         if (!state.player || !state.currentSong) return;
-        keepAudioAlive();
         if (state.isPlaying) {
           state.player.pauseVideo();
+          stopBackgroundAudio();
         } else {
           state.player.playVideo();
+          triggerBackgroundAudio();
         }
       });
 
