@@ -667,6 +667,21 @@
     <div id="hiddenPlayer" class="hidden-player"></div>
 
     <script>
+      // إنشاء صوت صامت في الخلفية لإبقاء الخدمة حية في أندرويد
+const dummyAudio = new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=");
+dummyAudio.loop = true;
+
+// تشغيل الصوت الصامت فوراً عند الضغط على زر التشغيل
+function keepAliveInBackground() {
+  dummyAudio.play().catch(() => {});
+}
+
+// تعديل دالة التشغيل لتستدعي الصوت الصامت
+const originalPlaySong = playSong;
+playSong = function(song, queue = state.songs) {
+  keepAliveInBackground();
+  originalPlaySong(song, queue);
+};
       const API_BASE =
         "https://you-tube-music-stream--youssebasse.replit.app/api";
       const FALLBACK_THUMBNAIL =
