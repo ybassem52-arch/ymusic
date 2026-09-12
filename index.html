@@ -170,7 +170,7 @@
 
       .hero {
         display: grid;
-        grid-template-columns: 1.4fr 0.6fr;
+        grid-template-columns: 1.2fr 1fr 0.8fr;
         gap: 18px;
         margin-bottom: 30px;
       }
@@ -192,7 +192,7 @@
       .hero-card h1 {
         max-width: 600px;
         margin: 0 0 10px;
-        font-size: clamp(28px, 5vw, 52px);
+        font-size: clamp(28px, 4vw, 48px);
         line-height: 1.05;
         letter-spacing: -2px;
       }
@@ -458,12 +458,13 @@
 
       .hidden-player {
         position: fixed;
-        top: -10px;
-        left: -10px;
-        width: 1px;
-        height: 1px;
-        opacity: 0;
+        bottom: 0;
+        left: 0;
+        width: 10px;
+        height: 10px;
+        opacity: 0.01;
         pointer-events: none;
+        z-index: -1;
       }
 
       .playlist-list {
@@ -501,13 +502,18 @@
         background: var(--red-dark);
       }
 
+      @media (max-width: 900px) {
+        .hero {
+          grid-template-columns: 1fr;
+        }
+      }
+
       @media (max-width: 780px) {
         .shell {
           padding: 18px 14px 145px;
         }
 
-        .topbar,
-        .hero {
+        .topbar {
           display: block;
         }
 
@@ -518,10 +524,6 @@
 
         .topbar-copy span {
           display: none;
-        }
-
-        .hero-card {
-          margin-bottom: 12px;
         }
 
         .hero-card,
@@ -550,10 +552,8 @@
     </style>
   </head>
   <body>
-    <!-- عنصر صوت خفي صامت يلف في loop ملوش نهاية لجبر المتصفح على الاستمرار في الخلفية -->
-    <audio id="backgroundKeepAlive" loop playsinline style="display:none;">
-      <source src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=" type="audio/wav">
-    </audio>
+    <!-- عنصر صوت صامت -->
+    <audio id="backgroundKeepAlive" loop playsinline style="display:none;"></audio>
 
     <main class="shell">
       <header class="topbar">
@@ -590,6 +590,10 @@
           <div class="hero-card">
             <h1>موسيقى على مزاجك.</h1>
             <p>ابحث عن الأغاني وشغّلها واحفظ المفضلة والقوائم على جهازك.</p>
+          </div>
+          <div class="hero-card">
+            <h1>شغّله على متصفح Brave</h1>
+            <p>لتجربة أفضل</p>
           </div>
           <div class="info-card">
             <strong id="resultLabel">الأكثر استماعًا</strong>
@@ -700,18 +704,19 @@
       const saveFavorites = (items) => localStorage.setItem("ymusic-favorites", JSON.stringify(items));
       const savePlaylists = (items) => localStorage.setItem("ymusic-playlists", JSON.stringify(items));
 
-      // تشغيل ملف HTML5 Audio صامت للحفاظ على جلسة الصوت نشطة بالأندرويد
+      let audioCtx = null;
       function triggerBackgroundAudio() {
-        const bgAudio = $("backgroundKeepAlive");
-        if (bgAudio) {
-          bgAudio.play().catch(() => {});
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === "suspended") {
+          audioCtx.resume();
         }
       }
 
       function stopBackgroundAudio() {
-        const bgAudio = $("backgroundKeepAlive");
-        if (bgAudio) {
-          bgAudio.pause();
+        if (audioCtx && audioCtx.state === "running") {
+          audioCtx.suspend();
         }
       }
 
@@ -980,12 +985,20 @@
 
         navigator.mediaSession.setActionHandler("play", () => {
           triggerBackgroundAudio();
-          if (state.player) state.player.playVideo();
+          if (state.player && typeof state.player.playVideo === "function") {
+            state.player.playVideo();
+            state.isPlaying = true;
+            updatePlayer();
+          }
         });
 
         navigator.mediaSession.setActionHandler("pause", () => {
           stopBackgroundAudio();
-          if (state.player) state.player.pauseVideo();
+          if (state.player && typeof state.player.pauseVideo === "function") {
+            state.player.pauseVideo();
+            state.isPlaying = false;
+            updatePlayer();
+          }
         });
 
         navigator.mediaSession.setActionHandler("previoustrack", () => {
@@ -1062,8 +1075,8 @@
 
       function onYouTubeIframeAPIReady() {
         state.player = new YT.Player("hiddenPlayer", {
-          width: "1",
-          height: "1",
+          width: "10",
+          height: "10",
           playerVars: {
             autoplay: 1,
             controls: 0,
