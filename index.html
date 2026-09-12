@@ -23,7 +23,6 @@
       };
     </script>
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
       :root {
         color-scheme: dark;
@@ -162,17 +161,6 @@
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-      }
-
-      .topbar-copy {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-      }
-
-      .topbar-copy span {
-        color: var(--muted);
-        font-size: 13px;
       }
 
       .search {
@@ -776,10 +764,6 @@
           margin-bottom: 0;
         }
 
-        .topbar-copy span {
-          display: none;
-        }
-
         .hero-card,
         .info-card {
           min-height: 0;
@@ -954,6 +938,7 @@
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
       import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
+      import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
       const firebaseConfig = {
         apiKey: "AIzaSyDec5HEfjnmMXN7MSR3Cm6Lgv5sNlnn-AM",
@@ -967,13 +952,21 @@
 
       const app = initializeApp(firebaseConfig);
       const analytics = getAnalytics(app);
-      window.firebaseApp = app;
+      const auth = getAuth(app);
+      const provider = new GoogleAuthProvider();
+
+      window.firebaseAuth = {
+        auth,
+        provider,
+        signInWithPopup,
+        signOut,
+        onAuthStateChanged
+      };
     </script>
 
     <script>
       const API_BASE = "https://you-tube-music-stream--youssebasse.replit.app/api";
       const FALLBACK_THUMBNAIL = "https://i.ytimg.com/vi/aqz-KE-bpKQ/hqdefault.jpg";
-      const GOOGLE_CLIENT_ID = "1027415477272-web.apps.googleusercontent.com"; // استبدل بـ Client ID الخاص بـ Google لو رغبت، أو يعمل بـ Token فك التشفر التلقائي
 
       const state = {
         songs: [],
@@ -992,7 +985,7 @@
         playerReady: false,
         pendingId: null,
         poller: null,
-        user: JSON.parse(localStorage.getItem("ymusic-user") || "null")
+        user: null
       };
 
       const $ = (id) => document.getElementById(id);
@@ -1335,93 +1328,46 @@
         if (view === "history") renderHistory();
       }
 
-      function parseJwt(token) {
-        try {
-          const base64Url = token.split('.')[1];
-          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-          const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-              return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-          }).join(''));
-          return JSON.parse(jsonPayload);
-        } catch (e) {
-          return null;
-        }
-      }
-
-      window.handleCredentialResponse = function(response) {
-        const data = parseJwt(response.credential);
-        if (data) {
-          state.user = {
-            email: data.email,
-            name: data.name,
-            picture: data.picture
-          };
-          localStorage.setItem("ymusic-user", JSON.stringify(state.user));
+      function initAuth() {
+        const { auth, provider, signInWithPopup, signOut, onAuthStateChanged } = window.firebaseAuth;
+        
+        onAuthStateChanged(auth, (user) => {
+          state.user = user;
           updateAuthUI();
-        }
-      };
+        });
+      }
 
       function updateAuthUI() {
         const container = $("authContainer");
         if (state.user) {
           container.innerHTML = `
             <div class="user-avatar-container" id="userProfileBtn" title="تسجيل الخروج">
-              <img src="${escapeHtml(state.user.picture)}" alt="صورة الحساب" class="user-avatar">
-              <span class="user-name">${escapeHtml(state.user.name || state.user.email)}</span>
+              <img src="${escapeHtml(state.user.photoURL || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + state.user.email)}" alt="صورة الحساب" class="user-avatar">
+              <span class="user-name">${escapeHtml(state.user.displayName || state.user.email.split('@')[0])}</span>
             </div>
           `;
-          $("userProfileBtn").addEventListener("click", () => {
-            if (confirm("هل تريد تسجيل الخروج من حساب جوجل؟")) {
-              localStorage.removeItem("ymusic-user");
-              state.user = null;
-              initGoogleAuthButton();
+          $("userProfileBtn").addEventListener("click", async () => {
+            if (confirm("هل تريد تسجيل الخروج؟")) {
+              try {
+                await window.firebaseAuth.signOut(window.firebaseAuth.auth);
+              } catch (e) {
+                console.error(e);
+              }
             }
           });
         } else {
-          initGoogleAuthButton();
-        }
-      }
-
-      function initGoogleAuthButton() {
-        const container = $("authContainer");
-        container.innerHTML = `<button class="auth-btn" id="authBtn">تسجيل الدخول</button>`;
-        
-        $("authBtn").addEventListener("click", () => {
-          if (typeof google !== "undefined" && google.accounts) {
-            google.accounts.id.initialize({
-              client_id: GOOGLE_CLIENT_ID,
-              callback: handleCredentialResponse
-            });
-            google.accounts.id.prompt((notification) => {
-              if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-                // تفعيل الفتح المباشر إذا فشل الـ prompt التلقائي
-                google.accounts.id.renderButton(
-                  document.getElementById("authContainer"),
-                  { theme: "outline", size: "large", shape: "pill" }
-                );
-              }
-            });
-          } else {
-            // طريقة بديلة في حال لم يحمل سيرفر جوجل لسبب ما
-            const email = prompt("أدخل بريد جوجل (Gmail) الخاص بك:");
-            if (!email || !email.includes("@")) return;
-            const name = prompt("أدخل اسمك:") || "مستخدم";
-            const picture = prompt("أدخل رابط صورة البروفايل (اتركه فارغاً للصورة التلقائية):") || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(email)}`;
-            state.user = { email, name, picture };
-            localStorage.setItem("ymusic-user", JSON.stringify(state.user));
-            updateAuthUI();
-          }
-        });
-      }
-
-      window.onload = function() {
-        if (typeof google !== "undefined" && google.accounts) {
-          google.accounts.id.initialize({
-            client_id: GOOGLE_CLIENT_ID,
-            callback: handleCredentialResponse
+          container.innerHTML = `<button class="auth-btn" id="authBtn">تسجيل الدخول</button>`;
+          $("authBtn").addEventListener("click", async () => {
+            try {
+              const { auth, provider, signInWithPopup } = window.firebaseAuth;
+              await signInWithPopup(auth, provider);
+            } catch (error) {
+              console.error("Auth error:", error);
+              alert("حدث خطأ أثناء تسجيل الدخول. تأكد من إعدادات Firebase Authentication.");
+            }
           });
         }
-      };
+      }
 
       async function loadSongs(query = "", category = "All") {
         $("songs").innerHTML = '<div class="loading">جارٍ تحميل الأغاني</div>';
@@ -1728,8 +1674,8 @@
       window.__ymusicYoutubeReadyCallback = onYouTubeIframeAPIReady;
       if (window.__ymusicYoutubeApiReady) onYouTubeIframeAPIReady();
 
+      setTimeout(initAuth, 500);
       setupMediaSession();
-      updateAuthUI();
       renderFavorites();
       renderPlaylists();
       renderHistory();
