@@ -133,7 +133,7 @@
         background: transparent;
         color: var(--text);
         direction: rtl;
-        padding-left: 30px; /* ترك مساحة لأيقونة المسح */
+        padding-left: 30px;
       }
 
       .search input::placeholder {
@@ -150,7 +150,7 @@
         height: 28px;
         border-radius: 50%;
         cursor: pointer;
-        display: none; /* مخفي افتراضياً */
+        display: none;
         align-items: center;
         justify-content: center;
         transition: all 0.2s ease;
@@ -735,7 +735,6 @@
             placeholder="ابحث عن أغنية أو فنان..."
           />
           <button type="button" class="search-clear-btn" id="searchClearBtn" title="مسح النص">
-            <!-- أيقونة سلة المهملات لمسح النص -->
             <svg viewBox="0 0 24 24" fill="currentColor">
               <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
             </svg>
@@ -747,6 +746,7 @@
         <button class="active" data-view="home">الرئيسية</button>
         <button data-view="favorites">المفضلة</button>
         <button data-view="playlists">قوائم التشغيل</button>
+        <button data-view="history">السجل</button>
       </nav>
 
       <section id="homeView">
@@ -784,7 +784,7 @@
           <h2 id="sectionTitle">Trending</h2>
           <small id="songCount"></small>
         </div>
-        <div id="songs" class="songs">
+        <div id="songs" classs="songs">
           <div class="loading">جارٍ تحميل الأغاني</div>
         </div>
       </section>
@@ -803,6 +803,14 @@
           <button class="primary-button" id="newPlaylist">قائمة جديدة</button>
         </div>
         <div id="playlists" class="playlist-list"></div>
+      </section>
+
+      <section id="historyView" hidden>
+        <div class="section-head">
+          <h2>سجل الاستماع</h2>
+          <button class="secondary-button" id="clearHistoryBtn">مسح السجل</button>
+        </div>
+        <div id="historySongs" class="songs"></div>
       </section>
     </main>
 
@@ -851,6 +859,26 @@
       </div>
     </div>
 
+    <!-- Firebase SDKs -->
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+      import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyDec5HEfjnmMXN7MSR3Cm6Lgv5sNlnn-AM",
+        authDomain: "ymusic-b66e7.firebaseapp.com",
+        projectId: "ymusic-b66e7",
+        storageBucket: "ymusic-b66e7.firebasestorage.app",
+        messagingSenderId: "1027415477272",
+        appId: "1:1027415477272:web:40bf45c3e1231fca7c476d",
+        measurementId: "G-HH1QN851LD"
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const analytics = getAnalytics(app);
+      window.firebaseApp = app;
+    </script>
+
     <script>
       const API_BASE = "https://you-tube-music-stream--youssebasse.replit.app/api";
       const FALLBACK_THUMBNAIL = "https://i.ytimg.com/vi/aqz-KE-bpKQ/hqdefault.jpg";
@@ -877,8 +905,21 @@
       const $ = (id) => document.getElementById(id);
       const favorites = () => JSON.parse(localStorage.getItem("ymusic-favorites") || "[]");
       const playlists = () => JSON.parse(localStorage.getItem("ymusic-playlists") || "[]");
+      const historySongs = () => JSON.parse(localStorage.getItem("ymusic-history") || "[]");
+      
       const saveFavorites = (items) => localStorage.setItem("ymusic-favorites", JSON.stringify(items));
       const savePlaylists = (items) => localStorage.setItem("ymusic-playlists", JSON.stringify(items));
+      
+      function saveToHistory(song) {
+        let items = historySongs();
+        // إزالة الأغنية لو كانت موجودة مسبقاً لتفادي التكرار ووضعها في المقدمة
+        items = items.filter(item => item.id !== song.id);
+        items.unshift(song);
+        // الاحتفاظ بآخر 50 أغنية فقط في السجل
+        if (items.length > 50) items.pop();
+        localStorage.setItem("ymusic-history", JSON.stringify(items));
+        if (state.view === "history") renderHistory();
+      }
 
       let audioCtx = null;
       function triggerBackgroundAudio() {
@@ -931,6 +972,7 @@
         saveFavorites(items);
         renderSongs();
         renderFavorites();
+        if (state.view === "history") renderHistory();
         updatePlayerFavorite();
       }
 
@@ -1010,7 +1052,48 @@
               if (song) toggleFavorite(song);
             });
           });
+        $("favorites")
+          .querySelectorAll("[data-add-playlist]")
+          .forEach((button) => {
+            button.addEventListener("click", () => addSongToPlaylist(button.dataset.addPlaylist));
+          });
       }
+
+      function renderHistory() {
+        const items = historySongs();
+        $("historySongs").innerHTML = items.length
+          ? items.map(songCard).join("")
+          : '<div class="empty">سجل الاستماع فارغ حتى الآن.</div>';
+        
+        $("historySongs")
+          .querySelectorAll("[data-play]")
+          .forEach((button) => {
+            button.addEventListener("click", () => {
+              const song = items.find((item) => item.id === button.dataset.play);
+              if (song) playSong(song, items);
+            });
+          });
+        $("historySongs")
+          .querySelectorAll("[data-favorite]")
+          .forEach((button) => {
+            button.addEventListener("click", () => {
+              const song = items.find((item) => item.id === button.dataset.favorite);
+              if (song) toggleFavorite(song);
+            });
+          });
+        $("historySongs")
+          .querySelectorAll("[data-add-playlist]")
+          .forEach((button) => {
+            button.addEventListener("click", () => addSongToPlaylist(button.dataset.addPlaylist));
+          });
+      }
+
+      $("clearHistoryBtn").addEventListener("click", () => {
+        if (confirm("هل أنت متأكد من مسح سجل الاستماع بالكامل؟")) {
+          localStorage.removeItem("ymusic-history");
+          renderHistory();
+        }
+      });
 
       function renderPlaylists() {
         const items = playlists();
@@ -1062,7 +1145,6 @@
           });
       }
 
-      // إدارة الحذف من داخل نافذة التأكيد Modal
       $("cancelDeletePlaylistBtn").addEventListener("click", () => {
         $("deletePlaylistModal").classList.remove("active");
         state.playlistToDelete = null;
@@ -1092,7 +1174,8 @@
           state.currentSong?.id === id
             ? state.currentSong
             : state.songs.find((item) => item.id === id) ||
-              favorites().find((item) => item.id === id);
+              favorites().find((item) => item.id === id) ||
+              historySongs().find((item) => item.id === id);
         if (!song) return;
 
         if (!items.length) {
@@ -1155,8 +1238,10 @@
         $("homeView").hidden = view !== "home";
         $("favoritesView").hidden = view !== "favorites";
         $("playlistsView").hidden = view !== "playlists";
+        $("historyView").hidden = view !== "history";
         if (view === "favorites") renderFavorites();
         if (view === "playlists") renderPlaylists();
+        if (view === "history") renderHistory();
       }
 
       async function loadSongs(query = "", category = "All") {
@@ -1348,6 +1433,9 @@
         state.duration = 0;
         state.isPlaying = true;
 
+        // حفظ الأغنية في السجل تلقائياً عند التشغيل
+        saveToHistory(song);
+
         updateMediaSessionMetadata(song);
         updatePlayer();
 
@@ -1383,7 +1471,6 @@
         if (previous) playSong(previous, state.queue);
       }
 
-      // --- التحكم بمدخلات البحث وزر المسح (سلة المهملات) ---
       const searchInput = $("searchInput");
       const searchClearBtn = $("searchClearBtn");
 
@@ -1465,6 +1552,7 @@
       setupMediaSession();
       renderFavorites();
       renderPlaylists();
+      renderHistory();
       loadSongs();
     </script>
   </body>
