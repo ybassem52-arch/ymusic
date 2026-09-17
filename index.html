@@ -523,7 +523,25 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 8px;
+        gap: 6px;
+      }
+
+      .seek-btn {
+        width: 32px;
+        height: 32px;
+        font-size: 11px;
+        font-weight: 700;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--muted);
+        display: grid;
+        place-items: center;
+        transition: all 0.2s ease;
+      }
+
+      .seek-btn:hover {
+        background: rgba(255, 59, 69, 0.2);
+        color: var(--red);
       }
 
       .play-button {
@@ -556,6 +574,7 @@
         border-radius: 99px;
         background: #363b46;
         cursor: pointer;
+        overflow: hidden;
       }
 
       .progress-fill {
@@ -564,6 +583,7 @@
         border-radius: inherit;
         background: var(--red);
         pointer-events: none;
+        transition: width 0.1s linear;
       }
 
       .hidden-player {
@@ -909,7 +929,9 @@
       </div>
       <div class="player-controls">
         <button class="icon-button" id="previousButton" title="السابق">⏮</button>
+        <button class="seek-btn" id="rewind10Btn" title="إرجاع 10 ثوانٍ">-10s</button>
         <button class="play-button" id="playButton" title="تشغيل أو إيقاف">▶</button>
+        <button class="seek-btn" id="forward10Btn" title="تقديم 10 ثوانٍ">+10s</button>
         <button class="icon-button" id="nextButton" title="التالي">⏭</button>
         <button class="icon-button" id="playerPlaylist" title="إضافة إلى قائمة التشغيل">＋</button>
         <button class="icon-button" id="playerFavorite" title="المفضلة">♡</button>
@@ -1499,7 +1521,15 @@
             state.duration = state.player.getDuration() || state.duration;
             updatePlayer();
           } catch {}
-        }, 500);
+        }, 200);
+      }
+
+      function seekBy(seconds) {
+        if (!state.player || !state.currentSong) return;
+        const newTime = Math.max(0, Math.min(state.duration, state.position + seconds));
+        state.player.seekTo(newTime, true);
+        state.position = newTime;
+        updatePlayer();
       }
 
       function onYouTubeIframeAPIReady() {
@@ -1653,6 +1683,9 @@
           triggerBackgroundAudio();
         }
       });
+
+      $("rewind10Btn").addEventListener("click", () => seekBy(-10));
+      $("forward10Btn").addEventListener("click", () => seekBy(10));
 
       $("nextButton").addEventListener("click", playNext);
       $("previousButton").addEventListener("click", playPrevious);
