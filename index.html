@@ -570,20 +570,41 @@
       .progress {
         position: relative;
         flex: 1;
-        height: 6px;
+        height: 8px;
         border-radius: 99px;
         background: #363b46;
         cursor: pointer;
-        overflow: hidden;
+        touch-action: none; /* يمنع سحب الشاشة أثناء التحريك بالصباع */
+        padding: 4px 0; /* بيوسع المنطقة الحساسة للمس بصباعك */
+        background-clip: content-box;
       }
 
       .progress-fill {
-        width: 0;
+        position: relative;
+        width: 0%;
         height: 100%;
         border-radius: inherit;
         background: var(--red);
         pointer-events: none;
-        transition: width 0.1s linear;
+      }
+
+      /* نقطة السحب بصباعك */
+      .progress-dot {
+        position: absolute;
+        left: 100%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 14px;
+        height: 14px;
+        background: #fff;
+        border-radius: 50%;
+        box-shadow: 0 0 8px rgba(0, 0, 0, 0.6);
+        transition: transform 0.1s ease;
+      }
+
+      .progress:active .progress-dot,
+      .progress.dragging .progress-dot {
+        transform: translate(-50%, -50%) scale(1.3);
       }
 
       .hidden-player {
@@ -939,7 +960,9 @@
       <div class="progress-wrap">
         <span class="time" id="currentTime">0:00</span>
         <div class="progress" id="progress">
-          <div class="progress-fill" id="progressFill"></div>
+          <div class="progress-fill" id="progressFill">
+            <div class="progress-dot"></div>
+          </div>
         </div>
         <span class="time" id="duration">0:00</span>
       </div>
@@ -1007,7 +1030,8 @@
         playerReady: false,
         pendingId: null,
         poller: null,
-        user: null
+        user: null,
+        isDragging: false // متغير للتحكم بالسحب بصباعك
       };
 
       const $ = (id) => document.getElementById(id);
@@ -1419,7 +1443,11 @@
         $("playButton").textContent = state.isPlaying ? "❚❚" : "▶";
         $("currentTime").textContent = formatTime(state.position);
         $("duration").textContent = formatTime(state.duration);
-        $("progressFill").style.width = `${state.duration ? Math.min(100, (state.position / state.duration) * 100) : 0}%`;
+        
+        // لا نحدث العرض إذا كان المستخدم يحرك بصباعه لمنع التقطيع
+        if (!state.isDragging) {
+          $("progressFill").style.width = `${state.duration ? Math.min(100, (state.position / state.duration) * 100) : 0}%`;
+        }
         
         updatePlayerFavorite();
         updateMediaSessionState();
@@ -1515,7 +1543,7 @@
       function startPolling() {
         stopPolling();
         state.poller = setInterval(() => {
-          if (!state.player || !state.isPlaying) return;
+          if (!state.player || !state.isPlaying || state.isDragging) return;
           try {
             state.position = state.player.getCurrentTime() || 0;
             state.duration = state.player.getDuration() || state.duration;
@@ -1695,14 +1723,60 @@
       $("playerFavorite").addEventListener("click", () => {
         if (state.currentSong) toggleFavorite(state.currentSong);
       });
-      $("progress").addEventListener("click", (event) => {
+
+      // --- نظام السحب واللمس الحقيقي للتايم لاين ---
+      const progressContainer = $("progress");
+
+      function getRatioFromEvent(e) {
+        const rect = progressContainer.getBoundingClientRect();
+        const clientX = e.touches && e.touches.length > 0 ? e.touches[0].clientX : (e.changedTouches && e.changedTouches.length > 0 ? e.changedTouches[0].clientX : e.clientX);
+        let offsetX = clientX - rect.left;
+        if (offsetX < 0) offsetX = 0;
+        if (offsetX > rect.width) offsetX = rect.width;
+        return offsetX / rect.width;
+      }
+
+      function handleDragStart(e) {
         if (!state.duration || !state.player) return;
-        const rect = event.currentTarget.getBoundingClientRect();
-        const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
-        state.player.seekTo(ratio * state.duration, true);
-        state.position = ratio * state.duration;
+        state.isDragging = true;
+        progressContainer.classList.add("dragging");
+        handleDragMove(e);
+      }
+
+      function handleDragMove(e) {
+        if (!state.isDragging) return;
+        if (e.cancelable) e.preventDefault(); // يمنع عمل سكرول أثناء السحب بالصباع
+        const ratio = getRatioFromEvent(e);
+        const currentPos = ratio * state.duration;
+        
+        // تحديث المظهر بالصباع لحظة بلحظة
+        $("progressFill").style.width = `${ratio * 100}%`;
+        $("currentTime").textContent = formatTime(currentPos);
+      }
+
+      function handleDragEnd(e) {
+        if (!state.isDragging) return;
+        const ratio = getRatioFromEvent(e);
+        const newTime = ratio * state.duration;
+        
+        if (state.player) {
+          state.player.seekTo(newTime, true);
+          state.position = newTime;
+        }
+        
+        state.isDragging = false;
+        progressContainer.classList.remove("dragging");
         updatePlayer();
-      });
+      }
+
+      // ربط أحداث اللمس (موبايل) والماوس (كمبيوتر)
+      progressContainer.addEventListener("mousedown", handleDragStart);
+      window.addEventListener("mousemove", handleDragMove);
+      window.addEventListener("mouseup", handleDragEnd);
+
+      progressContainer.addEventListener("touchstart", handleDragStart, { passive: false });
+      window.addEventListener("touchmove", handleDragMove, { passive: false });
+      window.addEventListener("touchend", handleDragEnd);
 
       window.__ymusicYoutubeReadyCallback = onYouTubeIframeAPIReady;
       if (window.__ymusicYoutubeApiReady) onYouTubeIframeAPIReady();
