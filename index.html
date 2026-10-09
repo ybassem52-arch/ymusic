@@ -395,7 +395,7 @@
 
       .songs {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(285px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(265px, 1fr));
         gap: 12px;
       }
 
@@ -453,13 +453,12 @@
       .song-actions {
         display: flex;
         gap: 2px;
-        align-items: center;
       }
 
       .icon-button {
         display: grid;
-        width: 33px;
-        height: 33px;
+        width: 35px;
+        height: 35px;
         place-items: center;
         border-radius: 50%;
         background: transparent;
@@ -467,29 +466,10 @@
         transition: background 0.2s, color 0.2s;
       }
 
-      .icon-button svg {
-        width: 17px;
-        height: 17px;
-        fill: currentColor;
-      }
-
       .icon-button:hover,
       .icon-button.active {
         background: rgba(255, 59, 69, 0.13);
         color: var(--red);
-      }
-
-      /* تنسيق زر التحميل المخصص بالسحابة */
-      .icon-button.download-btn {
-        color: #38bdf8; /* لون سماوي متناسق مع تصميم السحابة */
-      }
-      .icon-button.download-btn:hover {
-        background: rgba(56, 189, 248, 0.15);
-        color: #0ea5e9;
-      }
-      .icon-button.download-btn.cached {
-        color: #22c55e; /* أخضر لو الأغنية اتحملت خلاص */
-        background: rgba(34, 197, 94, 0.12);
       }
 
       .empty,
@@ -670,6 +650,22 @@
       .progress:active .progress-dot,
       .progress.dragging .progress-dot {
         transform: translate(50%, -50%) scale(1.3);
+      }
+
+      .quality-selector {
+        background: transparent;
+        color: var(--muted);
+        border: none;
+        outline: none;
+        font-size: 11px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 3px;
+      }
+
+      .quality-selector:hover {
+        color: var(--text);
       }
 
       .quality-dropdown {
@@ -1150,7 +1146,7 @@
         position: 0,
         category: "All",
         query: "",
-        searchMode: "audio",
+        searchMode: "audio", // 'audio' or 'video'
         view: "home",
         activePlaylistId: null,
         playlistToDelete: null,
@@ -1159,8 +1155,7 @@
         pendingId: null,
         poller: null,
         user: null,
-        isDragging: false,
-        cachedSongIds: new Set()
+        isDragging: false
       };
 
       const $ = (id) => document.getElementById(id);
@@ -1178,44 +1173,6 @@
         if (items.length > 50) items.pop();
         localStorage.setItem("ymusic-history", JSON.stringify(items));
         if (state.view === "history") renderHistory();
-      }
-
-      // دوال التحفظ والتخزين المؤقت (Cache)
-      async function checkCachedSongs() {
-        if (!('caches' in window)) return;
-        try {
-          const cache = await caches.open('ymusic-offline-cache-v1');
-          const requests = await cache.keys();
-          state.cachedSongIds.clear();
-          requests.forEach(req => {
-            const url = req.url;
-            // نستخرج معرف الأغنية أو الرابط المخزن
-            state.cachedSongIds.add(url);
-          });
-        } catch (e) {}
-      }
-
-      async function downloadSongToCache(song) {
-        if (!('caches' in window)) {
-          alert("متصفحك لا يدعم التخزين المؤقت.");
-          return;
-        }
-        try {
-          const cache = await caches.open('ymusic-offline-cache-v1');
-          // تخزين بيانات الأغنية والصفحة المرتبطة بها في الكاش
-          const targetUrl = `${API_BASE}/music/search?q=${song.id}`;
-          await cache.add(targetUrl);
-          state.cachedSongIds.add(targetUrl);
-          state.cachedSongIds.add(song.id);
-          
-          alert(`تم تحميل الأغنية (${song.title}) بنجاح للاستماع المؤقت! ☁️`);
-          renderSongs();
-          if (state.view === "favorites") renderFavorites();
-          if (state.view === "history") renderHistory();
-        } catch (err) {
-          console.error("خطأ أثناء التخزين المؤقت:", err);
-          alert("تعذر تحميل الأغنية، تأكد من الاتصال بالإنترنت.");
-        }
       }
 
       let audioCtx = null;
@@ -1261,10 +1218,6 @@
         return favorites().some((song) => song.id === id);
       }
 
-      function isCached(songId) {
-        return state.cachedSongIds.has(songId) || state.cachedSongIds.has(`${API_BASE}/music/search?q=${songId}`);
-      }
-
       function toggleFavorite(song) {
         const items = favorites();
         const index = items.findIndex((item) => item.id === song.id);
@@ -1279,13 +1232,11 @@
 
       function songCard(song) {
         const favorite = isFavorite(song.id);
-        const cached = isCached(song.id);
         const playing = state.currentSong?.id === song.id;
         const inPlaylist = state.view === "home" && state.activePlaylistId;
         const playlistAction = inPlaylist
           ? `<button class="icon-button" data-remove-playlist="${escapeHtml(state.activePlaylistId)}" data-remove-song="${escapeHtml(song.id)}" title="إزالة من قائمة التشغيل">−</button>`
           : `<button class="icon-button" data-add-playlist="${escapeHtml(song.id)}" title="إضافة لقائمة">＋</button>`;
-        
         return `
           <article class="song ${playing ? "playing" : ""}">
             <img class="cover" src="${escapeHtml(song.thumbnail || FALLBACK_THUMBNAIL)}" alt="" loading="lazy" />
@@ -1294,54 +1245,11 @@
               <div class="song-artist">${escapeHtml(song.artist || "YouTube")}</div>
             </div>
             <div class="song-actions">
-              <button class="icon-button download-btn ${cached ? "cached" : ""}" data-download="${escapeHtml(song.id)}" title="${cached ? "محفوظ في الكاش (بدون نت)" : "تحميل إلى الكاش"}">
-                <svg viewBox="0 0 24 24">
-                  <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/>
-                </svg>
-              </button>
               <button class="icon-button ${favorite ? "active" : ""}" data-favorite="${escapeHtml(song.id)}" title="المفضلة">${favorite ? "♥" : "♡"}</button>
               ${playlistAction}
             </div>
           </article>
         `;
-      }
-
-      function attachSongEvents(containerId) {
-        const container = $(containerId);
-        if (!container) return;
-
-        container.querySelectorAll("[data-play]").forEach((button) => {
-          button.addEventListener("click", () => playSongById(button.dataset.play, containerId));
-        });
-        container.querySelectorAll("[data-favorite]").forEach((button) => {
-          button.addEventListener("click", () => {
-            const song = getSongById(button.dataset.favorite);
-            if (song) toggleFavorite(song);
-          });
-        });
-        container.querySelectorAll("[data-download]").forEach((button) => {
-          button.addEventListener("click", () => {
-            const song = getSongById(button.dataset.download);
-            if (song) downloadSongToCache(song);
-          });
-        });
-        container.querySelectorAll("[data-add-playlist]").forEach((button) => {
-          button.addEventListener("click", () => addSongToPlaylist(button.dataset.addPlaylist));
-        });
-        container.querySelectorAll("[data-remove-playlist]").forEach((button) => {
-          button.addEventListener("click", () =>
-            removeSongFromPlaylist(button.dataset.removePlaylist, button.dataset.removeSong)
-          );
-        });
-      }
-
-      function getSongById(id) {
-        return (
-          state.songs.find(s => s.id === id) ||
-          favorites().find(s => s.id === id) ||
-          historySongs().find(s => s.id === id) ||
-          (state.currentSong?.id === id ? state.currentSong : null)
-        );
       }
 
       function renderSongs() {
@@ -1350,7 +1258,31 @@
           ? songs.map(songCard).join("")
           : '<div class="empty">لم نجد نتائج. جرّب كلمة بحث أخرى.</div>';
         $("songCount").textContent = songs.length ? `${songs.length} نتيجة` : "";
-        attachSongEvents("songs");
+        $("songs")
+          .querySelectorAll("[data-play]")
+          .forEach((button) => {
+            button.addEventListener("click", () => playSongById(button.dataset.play));
+          });
+        $("songs")
+          .querySelectorAll("[data-favorite]")
+          .forEach((button) => {
+            button.addEventListener("click", () => {
+              const song = state.songs.find((item) => item.id === button.dataset.favorite);
+              if (song) toggleFavorite(song);
+            });
+          });
+        $("songs")
+          .querySelectorAll("[data-add-playlist]")
+          .forEach((button) => {
+            button.addEventListener("click", () => addSongToPlaylist(button.dataset.addPlaylist));
+          });
+        $("songs")
+          .querySelectorAll("[data-remove-playlist]")
+          .forEach((button) => {
+            button.addEventListener("click", () =>
+              removeSongFromPlaylist(button.dataset.removePlaylist, button.dataset.removeSong)
+            );
+          });
       }
 
       function renderFavorites() {
@@ -1358,7 +1290,27 @@
         $("favorites").innerHTML = items.length
           ? items.map(songCard).join("")
           : '<div class="empty">لم تضف أي أغنية للمفضلة بعد.</div>';
-        attachSongEvents("favorites");
+        $("favorites")
+          .querySelectorAll("[data-play]")
+          .forEach((button) => {
+            button.addEventListener("click", () => {
+              const song = items.find((item) => item.id === button.dataset.play);
+              if (song) playSong(song, items);
+            });
+          });
+        $("favorites")
+          .querySelectorAll("[data-favorite]")
+          .forEach((button) => {
+            button.addEventListener("click", () => {
+              const song = items.find((item) => item.id === button.dataset.favorite);
+              if (song) toggleFavorite(song);
+            });
+          });
+        $("favorites")
+          .querySelectorAll("[data-add-playlist]")
+          .forEach((button) => {
+            button.addEventListener("click", () => addSongToPlaylist(button.dataset.addPlaylist));
+          });
       }
 
       function renderHistory() {
@@ -1366,7 +1318,28 @@
         $("historySongs").innerHTML = items.length
           ? items.map(songCard).join("")
           : '<div class="empty">سجل الاستماع فارغ حتى الآن.</div>';
-        attachSongEvents("historySongs");
+        
+        $("historySongs")
+          .querySelectorAll("[data-play]")
+          .forEach((button) => {
+            button.addEventListener("click", () => {
+              const song = items.find((item) => item.id === button.dataset.play);
+              if (song) playSong(song, items);
+            });
+          });
+        $("historySongs")
+          .querySelectorAll("[data-favorite]")
+          .forEach((button) => {
+            button.addEventListener("click", () => {
+              const song = items.find((item) => item.id === button.dataset.favorite);
+              if (song) toggleFavorite(song);
+            });
+          });
+        $("historySongs")
+          .querySelectorAll("[data-add-playlist]")
+          .forEach((button) => {
+            button.addEventListener("click", () => addSongToPlaylist(button.dataset.addPlaylist));
+          });
       }
 
       $("clearHistoryBtn").addEventListener("click", () => {
@@ -1451,7 +1424,12 @@
 
       function addSongToPlaylist(id) {
         const items = playlists();
-        const song = getSongById(id);
+        const song =
+          state.currentSong?.id === id
+            ? state.currentSong
+            : state.songs.find((item) => item.id === id) ||
+              favorites().find((item) => item.id === id) ||
+              historySongs().find((item) => item.id === id);
         if (!song) return;
 
         if (!items.length) {
@@ -1472,7 +1450,7 @@
         );
         if (!name) return;
         const playlist = items.find((item) => item.name.toLowerCase() === name.trim().toLowerCase());
-        if (!playlist) {
+        if (!playlist || !song) {
           alert("لم يتم العثور على القائمة. اكتب اسمها كما هو ظاهر.");
           return;
         }
@@ -1522,6 +1500,7 @@
 
       function initAuth() {
         const { auth, provider, signInWithPopup, signOut, onAuthStateChanged } = window.firebaseAuth;
+        
         onAuthStateChanged(auth, (user) => {
           state.user = user;
           updateAuthUI();
@@ -1580,7 +1559,6 @@
           $("songs").innerHTML = '<div class="empty">تعذر الاتصال بالخادم. أعد المحاولة.</div>';
           return;
         }
-        await checkCachedSongs();
         renderSongs();
       }
 
@@ -1651,7 +1629,9 @@
 
       function updateMediaSessionMetadata(song) {
         if (!("mediaSession" in navigator) || !song) return;
+
         const artworkUrl = song.thumbnail || FALLBACK_THUMBNAIL;
+
         navigator.mediaSession.metadata = new MediaMetadata({
           title: song.title || "ymusic",
           artist: song.artist || "YouTube",
@@ -1667,7 +1647,9 @@
 
       function updateMediaSessionState() {
         if (!("mediaSession" in navigator)) return;
+
         navigator.mediaSession.playbackState = state.isPlaying ? "playing" : "paused";
+
         if (state.duration > 0 && "setPositionState" in navigator.mediaSession) {
           try {
             navigator.mediaSession.setPositionState({
@@ -1763,6 +1745,7 @@
         state.isPlaying = true;
 
         saveToHistory(song);
+
         updateMediaSessionMetadata(song);
         updatePlayer();
 
@@ -1774,8 +1757,8 @@
       }
 
       function playSongById(id) {
-        const song = getSongById(id);
-        if (song) playSong(song, state.songs.length ? state.songs : [song]);
+        const song = state.songs.find((item) => item.id === id);
+        if (song) playSong(song, state.songs);
       }
 
       function playNext() {
@@ -1891,12 +1874,16 @@
 
       const progressContainer = $("progress");
 
+      // تصليح أبعاد شريط التقدم بالكامل واتجاه RTL
       function getRatioFromEvent(e) {
         const rect = progressContainer.getBoundingClientRect();
         const clientX = e.touches && e.touches.length > 0 ? e.touches[0].clientX : (e.changedTouches && e.changedTouches.length > 0 ? e.changedTouches[0].clientX : e.clientX);
+        
+        // في وضع RTL العكس تماماً: البداية تكون من اليمين والنهاية في اليسار
         let offsetX = rect.right - clientX;
         if (offsetX < 0) offsetX = 0;
         if (offsetX > rect.width) offsetX = rect.width;
+        
         return offsetX / rect.width;
       }
 
@@ -1912,6 +1899,7 @@
         if (e.cancelable) e.preventDefault();
         const ratio = getRatioFromEvent(e);
         const currentPos = ratio * state.duration;
+        
         $("progressFill").style.width = `${ratio * 100}%`;
         $("currentTime").textContent = formatTime(currentPos);
       }
@@ -1920,10 +1908,12 @@
         if (!state.isDragging) return;
         const ratio = getRatioFromEvent(e);
         const newTime = ratio * state.duration;
+        
         if (state.player) {
           state.player.seekTo(newTime, true);
           state.position = newTime;
         }
+        
         state.isDragging = false;
         progressContainer.classList.remove("dragging");
         updatePlayer();
@@ -1932,6 +1922,7 @@
       progressContainer.addEventListener("mousedown", handleDragStart);
       window.addEventListener("mousemove", handleDragMove);
       window.addEventListener("mouseup", handleDragEnd);
+
       progressContainer.addEventListener("touchstart", handleDragStart, { passive: false });
       window.addEventListener("touchmove", handleDragMove, { passive: false });
       window.addEventListener("touchend", handleDragEnd);
@@ -1941,12 +1932,10 @@
 
       setTimeout(initAuth, 500);
       setupMediaSession();
-      checkCachedSongs().then(() => {
-        renderFavorites();
-        renderPlaylists();
-        renderHistory();
-        loadSongs();
-      });
+      renderFavorites();
+      renderPlaylists();
+      renderHistory();
+      loadSongs();
     </script>
   </body>
-</html>
+  </html>
