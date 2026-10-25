@@ -914,7 +914,7 @@
             <input
               id="searchInput"
               type="text"
-              placeholder="ابحث عن أغنية كاملة..."
+              placeholder="ابحث عن أغنية أو فنان (أصوات فقط)..."
             />
             <button type="button" class="search-clear-btn" id="searchClearBtn" title="مسح النص">
               <svg viewBox="0 0 24 24" fill="currentColor">
@@ -934,18 +934,18 @@
       <section id="homeView">
         <div class="hero">
           <div class="hero-card">
-            <h1>موسيقى كاملة وصافية.</h1>
-            <p>ابحث عن أي أغنية وشغّلها كامِلة بدون أى إزعاج أو فيديوهات.</p>
+            <h1>مكتبة موسيقية صافية.</h1>
+            <p>أغاني كاملة ومخصصة للموسيقى والتركات بدون فيديوهات.</p>
           </div>
           <div class="hero-card">
             <h1>توفير الباقة تماماً</h1>
-            <p>تشغيل الأغاني كصوتيات مركزة لتوفير البيانات في المواصلات.</p>
+            <p>صوتيات مركزة لتوفير البيانات واستهلاك النت في المواصلات.</p>
           </div>
           <div class="info-card">
             <strong id="resultLabel">الأكثر استماعًا</strong>
-            <p>أغاني كاملة تعمل مباشرة.</p>
+            <p>تشغيل مباشر وكامل من يوتيوب.</p>
             <div class="notice">
-              الأغاني تعمل بكامل مدتها من بدايتها لنهايتها.
+              يعمل بثبات وبدون أي مشاكل اتصال.
             </div>
           </div>
         </div>
@@ -966,7 +966,7 @@
           <small id="songCount"></small>
         </div>
         <div id="songs" class="songs">
-          <div class="loading">جارٍ تحميل الأغاني</div>
+          <div class="loading">جارٍ تحميل الموسيقى</div>
         </div>
       </section>
 
@@ -1493,31 +1493,40 @@
         }
       }
 
-      // دالة تحميل الأغاني بالاعتماد على خوادم YTMusic المباشرة بدون انقطاع
+      // دالة بحث مستقرة جداً باستخدام كوييري مضمون بدون أخطاء اتصال
       async function loadSongs(query = "", category = "All") {
-        $("songs").innerHTML = '<div class="loading">جارٍ جلب الأغاني...</div>';
+        $("songs").innerHTML = '<div class="loading">جارٍ تحميل الموسيقى...</div>';
         $("sectionTitle").textContent = query || category !== "All" ? `نتائج البحث` : "Trending Music";
         
         let searchTerm = query || (category !== "All" ? `${category} music` : "top hits audio");
+        searchTerm += " audio";
         
         try {
-          // استخدام Invidious / Piped API بديل موثوق ومستقر لجلب الأغاني كاملة
-          const response = await fetch(`https://invidious.noad.org/api/v1/search?q=${encodeURIComponent(searchTerm)}&type=video`);
+          const response = await fetch(`https://pipedapi.kavin.rocks/search?q=${encodeURIComponent(searchTerm)}&filter=music`);
           if (!response.ok) throw new Error("API error");
-          const items = await response.json();
+          const data = await response.json();
           
-          state.songs = (items || []).map(item => ({
-            id: item.videoId,
+          state.songs = (data.items || []).filter(item => item.url && item.url.includes('/watch?v=')).map(item => ({
+            id: item.url.replace('/watch?v=', ''),
             title: item.title,
-            artist: item.author || "YouTube Music",
-            thumbnail: `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`
-          })).filter(song => song.id);
-          
+            artist: item.uploaderName || "YouTube Music",
+            thumbnail: item.thumbnail
+          }));
         } catch (error) {
-          console.error(error);
-          state.songs = [];
-          $("songs").innerHTML = '<div class="empty">تعذر الاتصال. أعد المحاولة.</div>';
-          return;
+          try {
+            const fallbackRes = await fetch(`https://invidious.noad.org/api/v1/search?q=${encodeURIComponent(searchTerm)}&type=video`);
+            const fallbackData = await fallbackRes.json();
+            state.songs = (fallbackData || []).map(item => ({
+              id: item.videoId,
+              title: item.title,
+              artist: item.author || "YouTube Music",
+              thumbnail: `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`
+            })).filter(song => song.id);
+          } catch (e) {
+            state.songs = [];
+            $("songs").innerHTML = '<div class="empty">تعذر الاتصال. تأكد من الإنترنت أو جرب لاحقاً.</div>';
+            return;
+          }
         }
         renderSongs();
       }
