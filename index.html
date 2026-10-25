@@ -1131,9 +1131,7 @@
         onAuthStateChanged
       };
     </script>
-
     <script>
-      const API_BASE = "https://you-tube-music-stream--youssebasse.replit.app/api";
       const FALLBACK_THUMBNAIL = "https://i.ytimg.com/vi/aqz-KE-bpKQ/hqdefault.jpg";
 
       const state = {
@@ -1242,7 +1240,7 @@
             <img class="cover" src="${escapeHtml(song.thumbnail || FALLBACK_THUMBNAIL)}" alt="" loading="lazy" />
             <div class="song-main" data-play="${escapeHtml(song.id)}">
               <div class="song-title">${escapeHtml(song.title)}</div>
-              <div class="song-artist">${escapeHtml(song.artist || "YouTube")}</div>
+              <div class="song-artist">${escapeHtml(song.artist || "YouTube Music")}</div>
             </div>
             <div class="song-actions">
               <button class="icon-button ${favorite ? "active" : ""}" data-favorite="${escapeHtml(song.id)}" title="المفضلة">${favorite ? "♥" : "♡"}</button>
@@ -1500,7 +1498,6 @@
 
       function initAuth() {
         const { auth, provider, signInWithPopup, signOut, onAuthStateChanged } = window.firebaseAuth;
-        
         onAuthStateChanged(auth, (user) => {
           state.user = user;
           updateAuthUI();
@@ -1533,30 +1530,35 @@
               await signInWithPopup(auth, provider);
             } catch (error) {
               console.error("Auth error:", error);
-              alert("حدث خطأ أثناء تسجيل الدخول. تأكد من إعدادات Firebase Authentication.");
+              alert("حدث خطأ أثناء تسجيل الدخول.");
             }
           });
         }
       }
 
+      // دالة تحميل الأغاني المحدثة عبر الخادم العام مع فلتر الموسيقى الصافي
       async function loadSongs(query = "", category = "All") {
         $("songs").innerHTML = '<div class="loading">جارٍ تحميل الأغاني</div>';
-        $("sectionTitle").textContent = query || category !== "All" ? `نتائج (${state.searchMode === 'audio' ? 'صوتيات' : 'فيديوهات'})` : "Trending";
+        $("sectionTitle").textContent = query || category !== "All" ? `نتائج البحث` : "Trending";
         
-        let params = query || (category !== "All" ? `${category} music` : "");
-        if (state.searchMode === "video" && params) {
-          params += " video";
-        }
-
-        const endpoint = params ? `/music/search?q=${encodeURIComponent(params)}` : "/music/trending";
+        let searchTerm = query || (category !== "All" ? `${category} music` : "Top hits music");
+        
         try {
-          const response = await fetch(API_BASE + endpoint);
+          const response = await fetch(`https://pipedapi.kavin.rocks/search?q=${encodeURIComponent(searchTerm)}&filter=music`);
           if (!response.ok) throw new Error("API error");
           const data = await response.json();
-          state.songs = Array.isArray(data.songs) ? data.songs : [];
-        } catch {
+          
+          state.songs = (data.items || []).map(item => ({
+            id: item.url ? item.url.replace('/watch?v=', '') : '',
+            title: item.title,
+            artist: item.uploaderName || "YouTube Music",
+            thumbnail: item.thumbnail
+          })).filter(song => song.id);
+          
+        } catch (error) {
+          console.error(error);
           state.songs = [];
-          $("songs").innerHTML = '<div class="empty">تعذر الاتصال بالخادم. أعد المحاولة.</div>';
+          $("songs").innerHTML = '<div class="empty">تعذر الاتصال بالخادم العام. أعد المحاولة.</div>';
           return;
         }
         renderSongs();
@@ -1568,7 +1570,7 @@
         if (!song) return;
         $("playerArtwork").src = song.thumbnail || FALLBACK_THUMBNAIL;
         $("playerTitle").textContent = song.title;
-        $("playerArtist").textContent = song.artist || "YouTube";
+        $("playerArtist").textContent = song.artist || "YouTube Music";
         $("playButton").textContent = state.isPlaying ? "❚❚" : "▶";
         $("currentTime").textContent = formatTime(state.position);
         $("duration").textContent = formatTime(state.duration);
@@ -1629,12 +1631,10 @@
 
       function updateMediaSessionMetadata(song) {
         if (!("mediaSession" in navigator) || !song) return;
-
         const artworkUrl = song.thumbnail || FALLBACK_THUMBNAIL;
-
         navigator.mediaSession.metadata = new MediaMetadata({
           title: song.title || "ymusic",
-          artist: song.artist || "YouTube",
+          artist: song.artist || "YouTube Music",
           album: "ymusic",
           artwork: [
             { src: artworkUrl, sizes: "96x96", type: "image/jpeg" },
@@ -1647,9 +1647,7 @@
 
       function updateMediaSessionState() {
         if (!("mediaSession" in navigator)) return;
-
         navigator.mediaSession.playbackState = state.isPlaying ? "playing" : "paused";
-
         if (state.duration > 0 && "setPositionState" in navigator.mediaSession) {
           try {
             navigator.mediaSession.setPositionState({
@@ -1745,7 +1743,6 @@
         state.isPlaying = true;
 
         saveToHistory(song);
-
         updateMediaSessionMetadata(song);
         updatePlayer();
 
@@ -1874,16 +1871,12 @@
 
       const progressContainer = $("progress");
 
-      // تصليح أبعاد شريط التقدم بالكامل واتجاه RTL
       function getRatioFromEvent(e) {
         const rect = progressContainer.getBoundingClientRect();
         const clientX = e.touches && e.touches.length > 0 ? e.touches[0].clientX : (e.changedTouches && e.changedTouches.length > 0 ? e.changedTouches[0].clientX : e.clientX);
-        
-        // في وضع RTL العكس تماماً: البداية تكون من اليمين والنهاية في اليسار
         let offsetX = rect.right - clientX;
         if (offsetX < 0) offsetX = 0;
         if (offsetX > rect.width) offsetX = rect.width;
-        
         return offsetX / rect.width;
       }
 
@@ -1899,7 +1892,6 @@
         if (e.cancelable) e.preventDefault();
         const ratio = getRatioFromEvent(e);
         const currentPos = ratio * state.duration;
-        
         $("progressFill").style.width = `${ratio * 100}%`;
         $("currentTime").textContent = formatTime(currentPos);
       }
@@ -1908,12 +1900,10 @@
         if (!state.isDragging) return;
         const ratio = getRatioFromEvent(e);
         const newTime = ratio * state.duration;
-        
         if (state.player) {
           state.player.seekTo(newTime, true);
           state.position = newTime;
         }
-        
         state.isDragging = false;
         progressContainer.classList.remove("dragging");
         updatePlayer();
@@ -1922,7 +1912,6 @@
       progressContainer.addEventListener("mousedown", handleDragStart);
       window.addEventListener("mousemove", handleDragMove);
       window.addEventListener("mouseup", handleDragEnd);
-
       progressContainer.addEventListener("touchstart", handleDragStart, { passive: false });
       window.addEventListener("touchmove", handleDragMove, { passive: false });
       window.addEventListener("touchend", handleDragEnd);
@@ -1936,6 +1925,6 @@
       renderPlaylists();
       renderHistory();
       loadSongs();
-    </script>
+          </script>
   </body>
   </html>
