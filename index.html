@@ -6,7 +6,7 @@
     <title>ymusic</title>
     <meta
       name="description"
-      content="مشغل موسيقى بسيط للبحث عن الأغاني وتشغيلها وحفظ المفضلة والقوائم."
+      content="مشغل موسيقى مخصص لـ YouTube Music و YouTube."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -169,6 +169,39 @@
         align-items: center;
         gap: 8px;
         width: min(500px, 100%);
+      }
+
+      .mode-toggle {
+        display: flex;
+        background: rgba(17, 19, 24, 0.88);
+        border: 1px solid var(--line);
+        border-radius: 15px;
+        padding: 3px;
+        gap: 2px;
+      }
+
+      .mode-btn {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 8px 12px;
+        border-radius: 12px;
+        font-size: 13px;
+        font-weight: 600;
+        background: transparent;
+        color: var(--muted);
+        transition: all 0.2s ease;
+      }
+
+      .mode-btn svg {
+        width: 16px;
+        height: 16px;
+        fill: currentColor;
+      }
+
+      .mode-btn.active {
+        background: var(--red);
+        color: white;
       }
 
       .search {
@@ -900,6 +933,16 @@
         </div>
 
         <div class="search-box-wrapper">
+          <div class="mode-toggle">
+            <button class="mode-btn active" id="audioModeBtn" title="البحث في الصوتيات (YouTube Music)">
+              <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+              <span>Audio</span>
+            </button>
+            <button class="mode-btn" id="videoModeBtn" title="البحث في الفيديوهات (YouTube)">
+              <svg viewBox="0 0 24 24"><path d="M21.58 7.19c-.23-.86-.91-1.54-1.77-1.77C18.25 5 12 5 12 5s-6.25 0-7.81.42c-.86.23-1.54.91-1.77 1.77C2 8.75 2 12 2 12s0 3.25.42 4.81c.23.86.91 1.54 1.77 1.77C5.75 19 12 19 12 19s6.25 0 7.81-.42c.86-.23 1.54-.91 1.77-1.77C22 15.25 22 12 22 12s0-3.25-.42-4.81zM9.75 15.02V8.98L15.5 12l-5.75 3.02z"/></svg>
+              <span>Video</span>
+            </button>
+          </div>
           <form class="search" id="searchForm">
             <svg
               class="search-icon"
@@ -914,7 +957,7 @@
             <input
               id="searchInput"
               type="text"
-              placeholder="ابحث عن أغنية رسمية من يوتيوب..."
+              placeholder="ابحث عن أغنية أو كليب..."
             />
             <button type="button" class="search-clear-btn" id="searchClearBtn" title="مسح النص">
               <svg viewBox="0 0 24 24" fill="currentColor">
@@ -934,18 +977,18 @@
       <section id="homeView">
         <div class="hero">
           <div class="hero-card">
-            <h1>موسيقى صافية برسمية يوتيوب.</h1>
-            <p>بحث مباشر ومستقر عبر يوتيوب API الرسمي بدون عطل ولا تعذر اتصال.</p>
+            <h1>موسيقى على مزاجك.</h1>
+            <p>ابحث عن الأغاني وشغّلها واحفظ المفضلة والقوائم على جهازك.</p>
           </div>
           <div class="hero-card">
-            <h1>توفير الباقة تماماً</h1>
-            <p>تشغيل الأغاني كصوتيات فقط لتوفير البيانات في المواصلات.</p>
+            <h1>شغّله على متصفح Brave</h1>
+            <p>لتجربة أفضل وبدون إعلانات مزعجة.</p>
           </div>
           <div class="info-card">
             <strong id="resultLabel">الأكثر استماعًا</strong>
-            <p>أغاني كاملة تعمل مباشرة وبثبات تام.</p>
+            <p>المحتوى يتم تحميله مباشرة من YouTube API الرسمي.</p>
             <div class="notice">
-              مدعوم ببحث يوتيوب المباشر والرسمي.
+              مدعوم ببحث يوتيوب المباشر وبدون خوادم خارجية.
             </div>
           </div>
         </div>
@@ -962,11 +1005,11 @@
         </div>
 
         <div class="section-head">
-          <h2 id="sectionTitle">Trending Music</h2>
+          <h2 id="sectionTitle">Trending</h2>
           <small id="songCount"></small>
         </div>
         <div id="songs" class="songs">
-          <div class="loading">جارٍ تحميل الموسيقى</div>
+          <div class="loading">جارٍ تحميل الأغاني</div>
         </div>
       </section>
 
@@ -1088,10 +1131,10 @@
         onAuthStateChanged
       };
     </script>
-    
+
     <script>
-      const FALLBACK_THUMBNAIL = "https://i.ytimg.com/vi/aqz-KE-bpKQ/hqdefault.jpg";
       const YOUTUBE_API_KEY = "AIzaSyBCNindQ2hzP1_Pja66Y9QnP2ZcXWSWPI0";
+      const FALLBACK_THUMBNAIL = "https://i.ytimg.com/vi/aqz-KE-bpKQ/hqdefault.jpg";
 
       const state = {
         songs: [],
@@ -1103,6 +1146,7 @@
         position: 0,
         category: "All",
         query: "",
+        searchMode: "audio", // 'audio' or 'video'
         view: "home",
         activePlaylistId: null,
         playlistToDelete: null,
@@ -1494,13 +1538,21 @@
         }
       }
 
-      // دالة بحث باستخدام YouTube Data API الرسمي المباشر
+      // دالة البحث المباشر الرسمية عبر يوتيوب API بدلاً من سيرفر ريبليت
       async function loadSongs(query = "", category = "All") {
-        $("songs").innerHTML = '<div class="loading">جارٍ البحث الرسمي...</div>';
+        $("songs").innerHTML = '<div class="loading">جارٍ البحث من يوتيوب...</div>';
         $("sectionTitle").textContent = query || category !== "All" ? `نتائج البحث` : "Trending Music";
         
         let searchTerm = query || (category !== "All" ? `${category} music` : "top hits audio");
-        searchTerm += " audio";
+        if (state.searchMode === "audio") {
+          if (!searchTerm.toLowerCase().includes("music") && !searchTerm.toLowerCase().includes("audio")) {
+            searchTerm += " audio";
+          }
+        } else {
+          if (!searchTerm.toLowerCase().includes("video")) {
+            searchTerm += " video";
+          }
+        }
 
         try {
           const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=20&q=${encodeURIComponent(searchTerm)}&type=video&videoCategoryId=10&key=${YOUTUBE_API_KEY}`;
@@ -1517,7 +1569,7 @@
           
         } catch (error) {
           state.songs = [];
-          $("songs").innerHTML = '<div class="empty">تعذر الاتصال بـ YouTube API. تحقق من المفتاح.</div>';
+          $("songs").innerHTML = '<div class="empty">تعذر الاتصال بـ YouTube API. تأكد من الإنترنت.</div>';
           return;
         }
         renderSongs();
@@ -1759,6 +1811,20 @@
         loadSongs(state.query, state.category);
       });
 
+      $("audioModeBtn").addEventListener("click", () => {
+        state.searchMode = "audio";
+        $("audioModeBtn").classList.add("active");
+        $("videoModeBtn").classList.remove("active");
+        loadSongs(state.query, state.category);
+      });
+
+      $("videoModeBtn").addEventListener("click", () => {
+        state.searchMode = "video";
+        $("videoModeBtn").classList.add("active");
+        $("audioModeBtn").classList.remove("active");
+        loadSongs(state.query, state.category);
+      });
+
       document.querySelectorAll(".nav button, .history-top-btn").forEach((button) => {
         button.addEventListener("click", () => {
           const view = button.dataset.view;
@@ -1819,9 +1885,11 @@
       function getRatioFromEvent(e) {
         const rect = progressContainer.getBoundingClientRect();
         const clientX = e.touches && e.touches.length > 0 ? e.touches[0].clientX : (e.changedTouches && e.changedTouches.length > 0 ? e.changedTouches[0].clientX : e.clientX);
+        
         let offsetX = rect.right - clientX;
         if (offsetX < 0) offsetX = 0;
         if (offsetX > rect.width) offsetX = rect.width;
+        
         return offsetX / rect.width;
       }
 
@@ -1837,6 +1905,7 @@
         if (e.cancelable) e.preventDefault();
         const ratio = getRatioFromEvent(e);
         const currentPos = ratio * state.duration;
+        
         $("progressFill").style.width = `${ratio * 100}%`;
         $("currentTime").textContent = formatTime(currentPos);
       }
@@ -1845,10 +1914,12 @@
         if (!state.isDragging) return;
         const ratio = getRatioFromEvent(e);
         const newTime = ratio * state.duration;
+        
         if (state.player) {
           state.player.seekTo(newTime, true);
           state.position = newTime;
         }
+        
         state.isDragging = false;
         progressContainer.classList.remove("dragging");
         updatePlayer();
@@ -1857,6 +1928,7 @@
       progressContainer.addEventListener("mousedown", handleDragStart);
       window.addEventListener("mousemove", handleDragMove);
       window.addEventListener("mouseup", handleDragEnd);
+
       progressContainer.addEventListener("touchstart", handleDragStart, { passive: false });
       window.addEventListener("touchmove", handleDragMove, { passive: false });
       window.addEventListener("touchend", handleDragEnd);
