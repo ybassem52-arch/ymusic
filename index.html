@@ -914,7 +914,7 @@
             <input
               id="searchInput"
               type="text"
-              placeholder="ابحث عن أغنية أو فنان (أصوات فقط)..."
+              placeholder="ابحث عن أغنية رسمية من يوتيوب..."
             />
             <button type="button" class="search-clear-btn" id="searchClearBtn" title="مسح النص">
               <svg viewBox="0 0 24 24" fill="currentColor">
@@ -934,18 +934,18 @@
       <section id="homeView">
         <div class="hero">
           <div class="hero-card">
-            <h1>مكتبة موسيقية صافية.</h1>
-            <p>أغاني كاملة ومخصصة للموسيقى والتركات بدون فيديوهات.</p>
+            <h1>موسيقى صافية برسمية يوتيوب.</h1>
+            <p>بحث مباشر ومستقر عبر يوتيوب API الرسمي بدون عطل ولا تعذر اتصال.</p>
           </div>
           <div class="hero-card">
             <h1>توفير الباقة تماماً</h1>
-            <p>صوتيات مركزة لتوفير البيانات واستهلاك النت في المواصلات.</p>
+            <p>تشغيل الأغاني كصوتيات فقط لتوفير البيانات في المواصلات.</p>
           </div>
           <div class="info-card">
             <strong id="resultLabel">الأكثر استماعًا</strong>
-            <p>تشغيل مباشر وكامل من يوتيوب.</p>
+            <p>أغاني كاملة تعمل مباشرة وبثبات تام.</p>
             <div class="notice">
-              يعمل بثبات وبدون أي مشاكل اتصال.
+              مدعوم ببحث يوتيوب المباشر والرسمي.
             </div>
           </div>
         </div>
@@ -1091,6 +1091,7 @@
     
     <script>
       const FALLBACK_THUMBNAIL = "https://i.ytimg.com/vi/aqz-KE-bpKQ/hqdefault.jpg";
+      const YOUTUBE_API_KEY = "AIzaSyBCNindQ2hzP1_Pja66Y9QnP2ZcXWSWPI0";
 
       const state = {
         songs: [],
@@ -1493,40 +1494,31 @@
         }
       }
 
-      // دالة بحث مستقرة جداً باستخدام كوييري مضمون بدون أخطاء اتصال
+      // دالة بحث باستخدام YouTube Data API الرسمي المباشر
       async function loadSongs(query = "", category = "All") {
-        $("songs").innerHTML = '<div class="loading">جارٍ تحميل الموسيقى...</div>';
+        $("songs").innerHTML = '<div class="loading">جارٍ البحث الرسمي...</div>';
         $("sectionTitle").textContent = query || category !== "All" ? `نتائج البحث` : "Trending Music";
         
         let searchTerm = query || (category !== "All" ? `${category} music` : "top hits audio");
         searchTerm += " audio";
-        
+
         try {
-          const response = await fetch(`https://pipedapi.kavin.rocks/search?q=${encodeURIComponent(searchTerm)}&filter=music`);
+          const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=20&q=${encodeURIComponent(searchTerm)}&type=video&videoCategoryId=10&key=${YOUTUBE_API_KEY}`;
+          const response = await fetch(url);
           if (!response.ok) throw new Error("API error");
           const data = await response.json();
           
-          state.songs = (data.items || []).filter(item => item.url && item.url.includes('/watch?v=')).map(item => ({
-            id: item.url.replace('/watch?v=', ''),
-            title: item.title,
-            artist: item.uploaderName || "YouTube Music",
-            thumbnail: item.thumbnail
-          }));
+          state.songs = (data.items || []).map(item => ({
+            id: item.id.videoId,
+            title: item.snippet.title,
+            artist: item.snippet.channelTitle || "YouTube Music",
+            thumbnail: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.medium?.url || FALLBACK_THUMBNAIL
+          })).filter(song => song.id);
+          
         } catch (error) {
-          try {
-            const fallbackRes = await fetch(`https://invidious.noad.org/api/v1/search?q=${encodeURIComponent(searchTerm)}&type=video`);
-            const fallbackData = await fallbackRes.json();
-            state.songs = (fallbackData || []).map(item => ({
-              id: item.videoId,
-              title: item.title,
-              artist: item.author || "YouTube Music",
-              thumbnail: `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`
-            })).filter(song => song.id);
-          } catch (e) {
-            state.songs = [];
-            $("songs").innerHTML = '<div class="empty">تعذر الاتصال. تأكد من الإنترنت أو جرب لاحقاً.</div>';
-            return;
-          }
+          state.songs = [];
+          $("songs").innerHTML = '<div class="empty">تعذر الاتصال بـ YouTube API. تحقق من المفتاح.</div>';
+          return;
         }
         renderSongs();
       }
