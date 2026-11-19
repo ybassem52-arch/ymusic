@@ -19,7 +19,9 @@
       window.__ymusicYoutubeApiReady = false;
       window.onYouTubeIframeAPIReady = () => {
         window.__ymusicYoutubeApiReady = true;
-        window.__ymusicYoutubeReadyCallback?.();
+        if (typeof window.initYMPlayer === "function") {
+          window.initYMPlayer();
+        }
       };
     </script>
     <script src="https://www.youtube.com/iframe_api"></script>
@@ -100,6 +102,7 @@
         display: flex;
         align-items: center;
         gap: 8px;
+        flex-wrap: wrap;
       }
 
       .history-top-btn,
@@ -412,6 +415,10 @@
         transition: 160ms ease;
       }
 
+      body.slow-net-mode .song {
+        grid-template-columns: 1fr auto;
+      }
+
       .song:hover,
       .song.playing {
         border-color: rgba(255, 59, 69, 0.45);
@@ -650,22 +657,6 @@
       .progress:active .progress-dot,
       .progress.dragging .progress-dot {
         transform: translate(50%, -50%) scale(1.3);
-      }
-
-      .quality-selector {
-        background: transparent;
-        color: var(--muted);
-        border: none;
-        outline: none;
-        font-size: 11px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 3px;
-      }
-
-      .quality-selector:hover {
-        color: var(--text);
       }
 
       .quality-dropdown {
@@ -912,40 +903,39 @@
       }
 
       /* يشتغل فقط لما يكون كلاس slow-net-mode موجود على body */
-body.slow-net-mode img,
-body.slow-net-mode .song-cover,
-body.slow-net-mode .thumbnail,
-body.slow-net-mode [class*="thumb"],
-body.slow-net-mode [class*="cover"] {
-  display: none !important;
-}
+      body.slow-net-mode img,
+      body.slow-net-mode .song-cover,
+      body.slow-net-mode .thumbnail,
+      body.slow-net-mode [class*="thumb"],
+      body.slow-net-mode [class*="cover"] {
+        display: none !important;
+      }
 
-body.slow-net-mode *,
-body.slow-net-mode *::before,
-body.slow-net-mode *::after {
-  animation: none !important;
-  transition: none !important;
-  backdrop-filter: none !important;
-  box-shadow: none !important;
-}
+      body.slow-net-mode *,
+      body.slow-net-mode *::before,
+      body.slow-net-mode *::after {
+        animation: none !important;
+        transition: none !important;
+        backdrop-filter: none !important;
+        box-shadow: none !important;
+      }
 
-.speed-btn-active {
-  outline: 2px solid #ff9800;
-  font-weight: bold;
-}
+      .speed-btn-active {
+        outline: 2px solid #ff9800;
+        font-weight: bold;
+      }
     </style>
   </head>
   <body>
     <audio id="backgroundKeepAlive" loop playsinline style="display:none;"></audio>
-<div id="speed-mode-switcher" style="display:flex; gap:8px; margin:10px 0;">
-  <button id="btn-normal-use" type="button">الاستخدام العادي</button>
-  <button id="btn-slow-use" type="button">السرعة البطيئة</button>
-</div>
     <main class="shell">
       <header class="topbar">
         <div class="topbar-left">
           <div class="brand">ymusic</div>
           <div class="topbar-actions">
+            <button class="history-top-btn" id="openSpeedModalBtn" type="button" title="اختيار وضع الاستخدام">
+              <span>وضع السرعة</span>
+            </button>
             <button class="history-top-btn" id="historyTopBtn" data-view="history" title="سجل الاستماع">
               <svg viewBox="0 0 24 24">
                 <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
@@ -1119,6 +1109,16 @@ body.slow-net-mode *::after {
 
     <div id="hiddenPlayer" class="hidden-player"></div>
 
+    <div class="modal-overlay" id="speedModeModal">
+      <div class="modal-card">
+        <p class="modal-title">اختر وضع الاستخدام المناسب لسرعة الإنترنت عندك:</p>
+        <div class="modal-actions">
+          <button class="btn-cancel" id="modalNormalModeBtn" type="button">الاستخدام العادي</button>
+          <button class="btn-confirm" id="modalSlowModeBtn" type="button">السرعة البطيئة</button>
+        </div>
+      </div>
+    </div>
+
     <div class="modal-overlay" id="deletePlaylistModal">
       <div class="modal-card">
         <p class="modal-title">هل أنت متأكد من حذف قائمة التشغيل هذه؟</p>
@@ -1130,93 +1130,6 @@ body.slow-net-mode *::after {
     </div>
 
     <script type="module">
-      const MODE_STORAGE_KEY = 'ymusic_playback_mode'; // يحفظ 'normal' أو 'slow' فقط
-
-// القراءة الافتراضية: الاستخدام العادي إلا لو اخترت السرعة البطيئة صراحةً
-let currentSpeedMode = localStorage.getItem(MODE_STORAGE_KEY) === 'slow' ? 'slow' : 'normal';
-
-function isSlowMode() {
-  return currentSpeedMode === 'slow';
-}
-
-function applySpeedMode(mode) {
-  currentSpeedMode = mode === 'slow' ? 'slow' : 'normal';
-  localStorage.setItem(MODE_STORAGE_KEY, currentSpeedMode);
-
-  const slowActive = isSlowMode();
-
-  // في الاستخدام العادي: يشيل كلاس السرعة البطيئة ويرجع كل حاجة لطبيعتها
-  document.body.classList.toggle('slow-net-mode', slowActive);
-
-  // تحديث شكل الأزرار
-  const normalBtn = document.getElementById('btn-normal-use');
-  const slowBtn = document.getElementById('btn-slow-use');
-  if (normalBtn) normalBtn.classList.toggle('speed-btn-active', !slowActive);
-  if (slowBtn) slowBtn.classList.toggle('speed-btn-active', slowActive);
-
-  // ضبط مشغل YouTube IFrame إن وجد
-  if (window.ytPlayer && typeof window.ytPlayer.setPlaybackQuality === 'function') {
-    window.ytPlayer.setPlaybackQuality(slowActive ? 'tiny' : 'default');
-  }
-
-  // ضبط عناصر audio / video المباشرة إن وجدت
-  document.querySelectorAll('audio, video').forEach((media) => {
-    if (slowActive) {
-      media.preload = 'none';
-    } else {
-      media.preload = 'metadata';
-    }
-  });
-}
-
-// دالة البحث المباشر (بدون كاش نتائج): 5 في السرعة البطيئة، و20 في الاستخدام العادي
-function buildYouTubeSearchUrl(query, apiKey) {
-  const maxResults = isSlowMode() ? 5 : 20;
-  const params = new URLSearchParams({
-    part: 'snippet',
-    type: 'video',
-    q: query,
-    maxResults: String(maxResults),
-    key: apiKey
-  });
-
-  if (isSlowMode()) {
-    params.set('videoCategoryId', '10');
-  }
-
-  return `https://www.googleapis.com/youtube/v3/search?${params.toString()}`;
-}
-
-// دالة اختيار الصورة: في السرعة البطيئة لا نستخدم صوراً، وفي العادي نرجع الصورة طبيعي
-function getTrackThumbnail(thumbnails) {
-  if (isSlowMode() || !thumbnails) return '';
-  return (
-    (thumbnails.high && thumbnails.high.url) ||
-    (thumbnails.medium && thumbnails.medium.url) ||
-    (thumbnails.default && thumbnails.default.url) ||
-    ''
-  );
-}
-
-// استدعاء هذه الدالة لما مشغل يوتيوب يكون جاهز
-function onYouTubePlayerReady(player) {
-  window.ytPlayer = player;
-  if (isSlowMode() && typeof player.setPlaybackQuality === 'function') {
-    player.setPlaybackQuality('tiny');
-  }
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  applySpeedMode(currentSpeedMode);
-
-  document.getElementById('btn-normal-use')?.addEventListener('click', () => {
-    applySpeedMode('normal');
-  });
-
-  document.getElementById('btn-slow-use')?.addEventListener('click', () => {
-    applySpeedMode('slow');
-  });
-});
       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
       import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
       import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
@@ -1248,6 +1161,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <script>
       const YOUTUBE_API_KEY = "AIzaSyBCNindQ2hzP1_Pja66Y9QnP2ZcXWSWPI0";
       const FALLBACK_THUMBNAIL = "https://i.ytimg.com/vi/aqz-KE-bpKQ/hqdefault.jpg";
+      const MODE_STORAGE_KEY = "ymusic_playback_mode";
 
       const state = {
         songs: [],
@@ -1259,7 +1173,7 @@ document.addEventListener('DOMContentLoaded', () => {
         position: 0,
         category: "All",
         query: "",
-        searchMode: "audio", // 'audio' or 'video'
+        searchMode: "audio",
         view: "home",
         activePlaylistId: null,
         playlistToDelete: null,
@@ -1268,8 +1182,62 @@ document.addEventListener('DOMContentLoaded', () => {
         pendingId: null,
         poller: null,
         user: null,
-        isDragging: false
+        isDragging: false,
+        speedMode: localStorage.getItem(MODE_STORAGE_KEY) === "slow" ? "slow" : "normal"
       };
+
+      function isSlowMode() {
+        return state.speedMode === "slow";
+      }
+
+      function getTrackThumbnail(thumbnails) {
+        if (isSlowMode() || !thumbnails) return "";
+        return (
+          thumbnails.high?.url ||
+          thumbnails.medium?.url ||
+          thumbnails.default?.url ||
+          ""
+        );
+      }
+
+      function applySpeedMode(mode, shouldReload = false) {
+        state.speedMode = mode === "slow" ? "slow" : "normal";
+        localStorage.setItem(MODE_STORAGE_KEY, state.speedMode);
+
+        const slowActive = isSlowMode();
+        document.body.classList.toggle("slow-net-mode", slowActive);
+
+        const speedModalBtn = document.getElementById("openSpeedModalBtn");
+        if (speedModalBtn) {
+          speedModalBtn.classList.toggle("active", slowActive);
+        }
+
+        const qualitySelect = document.getElementById("qualitySelect");
+        if (state.player && typeof state.player.setPlaybackQuality === "function") {
+          if (slowActive) {
+            state.player.setPlaybackQuality("tiny");
+          } else {
+            const chosenQuality = qualitySelect && qualitySelect.value !== "auto" ? qualitySelect.value : "default";
+            state.player.setPlaybackQuality(chosenQuality);
+          }
+        }
+
+        document.querySelectorAll("audio, video").forEach((media) => {
+          media.preload = slowActive ? "none" : "metadata";
+        });
+
+        if (shouldReload && state.view === "home" && !state.activePlaylistId) {
+          loadSongs(state.query, state.category);
+        }
+      }
+
+      function openSpeedModeModal() {
+        $("speedModeModal")?.classList.add("active");
+      }
+
+      function closeSpeedModeModal() {
+        $("speedModeModal")?.classList.remove("active");
+      }
 
       const $ = (id) => document.getElementById(id);
       const favorites = () => JSON.parse(localStorage.getItem("ymusic-favorites") || "[]");
@@ -1350,9 +1318,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const playlistAction = inPlaylist
           ? `<button class="icon-button" data-remove-playlist="${escapeHtml(state.activePlaylistId)}" data-remove-song="${escapeHtml(song.id)}" title="إزالة من قائمة التشغيل">−</button>`
           : `<button class="icon-button" data-add-playlist="${escapeHtml(song.id)}" title="إضافة لقائمة">＋</button>`;
+        const thumbSrc = isSlowMode() ? "" : (song.thumbnail || FALLBACK_THUMBNAIL);
         return `
           <article class="song ${playing ? "playing" : ""}">
-            <img class="cover" src="${escapeHtml(song.thumbnail || FALLBACK_THUMBNAIL)}" alt="" loading="lazy" />
+            ${isSlowMode() ? "" : `<img class="cover" src="${escapeHtml(thumbSrc)}" alt="" loading="lazy" />`}
             <div class="song-main" data-play="${escapeHtml(song.id)}">
               <div class="song-title">${escapeHtml(song.title)}</div>
               <div class="song-artist">${escapeHtml(song.artist || "YouTube Music")}</div>
@@ -1612,7 +1581,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       function initAuth() {
-        const { auth, provider, signInWithPopup, signOut, onAuthStateChanged } = window.firebaseAuth;
+        if (!window.firebaseAuth) return;
+        const { auth, onAuthStateChanged } = window.firebaseAuth;
         onAuthStateChanged(auth, (user) => {
           state.user = user;
           updateAuthUI();
@@ -1651,7 +1621,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
 
-      // دالة البحث المباشر الرسمية عبر يوتيوب API بدلاً من سيرفر ريبليت
+      // دالة البحث المباشر (5 نتائج في السرعة البطيئة، و20 في الاستخدام العادي)
       async function loadSongs(query = "", category = "All") {
         $("songs").innerHTML = '<div class="loading">جارٍ البحث من يوتيوب...</div>';
         $("sectionTitle").textContent = query || category !== "All" ? `نتائج البحث` : "Trending Music";
@@ -1667,8 +1637,10 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         }
 
+        const maxResults = isSlowMode() ? 5 : 20;
+
         try {
-          const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=20&q=${encodeURIComponent(searchTerm)}&type=video&videoCategoryId=10&key=${YOUTUBE_API_KEY}`;
+          const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=${maxResults}&q=${encodeURIComponent(searchTerm)}&type=video&videoCategoryId=10&key=${YOUTUBE_API_KEY}`;
           const response = await fetch(url);
           if (!response.ok) throw new Error("API error");
           const data = await response.json();
@@ -1677,7 +1649,7 @@ document.addEventListener('DOMContentLoaded', () => {
             id: item.id.videoId,
             title: item.snippet.title,
             artist: item.snippet.channelTitle || "YouTube Music",
-            thumbnail: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.medium?.url || FALLBACK_THUMBNAIL
+            thumbnail: getTrackThumbnail(item.snippet.thumbnails)
           })).filter(song => song.id);
           
         } catch (error) {
@@ -1692,7 +1664,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const song = state.currentSong;
         $("playerDock").hidden = !song;
         if (!song) return;
-        $("playerArtwork").src = song.thumbnail || FALLBACK_THUMBNAIL;
+        $("playerArtwork").src = isSlowMode() ? "" : (song.thumbnail || FALLBACK_THUMBNAIL);
         $("playerTitle").textContent = song.title;
         $("playerArtist").textContent = song.artist || "YouTube Music";
         $("playButton").textContent = state.isPlaying ? "❚❚" : "▶";
@@ -1755,17 +1727,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
       function updateMediaSessionMetadata(song) {
         if (!("mediaSession" in navigator) || !song) return;
-        const artworkUrl = song.thumbnail || FALLBACK_THUMBNAIL;
+        const artworkUrl = isSlowMode() ? "" : (song.thumbnail || FALLBACK_THUMBNAIL);
         navigator.mediaSession.metadata = new MediaMetadata({
           title: song.title || "ymusic",
           artist: song.artist || "YouTube Music",
           album: "ymusic",
-          artwork: [
-            { src: artworkUrl, sizes: "96x96", type: "image/jpeg" },
-            { src: artworkUrl, sizes: "128x128", type: "image/jpeg" },
-            { src: artworkUrl, sizes: "192x192", type: "image/jpeg" },
-            { src: artworkUrl, sizes: "512x512", type: "image/jpeg" },
-          ],
+          artwork: artworkUrl
+            ? [
+                { src: artworkUrl, sizes: "96x96", type: "image/jpeg" },
+                { src: artworkUrl, sizes: "128x128", type: "image/jpeg" },
+                { src: artworkUrl, sizes: "192x192", type: "image/jpeg" },
+                { src: artworkUrl, sizes: "512x512", type: "image/jpeg" },
+              ]
+            : [],
         });
       }
 
@@ -1810,7 +1784,8 @@ document.addEventListener('DOMContentLoaded', () => {
         updatePlayer();
       }
 
-      function onYouTubeIframeAPIReady() {
+      window.initYMPlayer = function () {
+        if (state.player || !window.YT || !window.YT.Player) return;
         state.player = new YT.Player("hiddenPlayer", {
           width: "10",
           height: "10",
@@ -1826,6 +1801,9 @@ document.addEventListener('DOMContentLoaded', () => {
           events: {
             onReady: () => {
               state.playerReady = true;
+              if (isSlowMode() && typeof state.player.setPlaybackQuality === "function") {
+                state.player.setPlaybackQuality("tiny");
+              }
               if (state.pendingId) {
                 state.player.loadVideoById(state.pendingId);
                 state.pendingId = null;
@@ -1834,6 +1812,9 @@ document.addEventListener('DOMContentLoaded', () => {
             onStateChange: (event) => {
               if (event.data === YT.PlayerState.PLAYING) {
                 state.isPlaying = true;
+                if (isSlowMode() && typeof state.player.setPlaybackQuality === "function") {
+                  state.player.setPlaybackQuality("tiny");
+                }
                 triggerBackgroundAudio();
                 startPolling();
               } else if (event.data === YT.PlayerState.PAUSED) {
@@ -1855,7 +1836,7 @@ document.addEventListener('DOMContentLoaded', () => {
             },
           },
         });
-      }
+      };
 
       function playSong(song, queue = state.songs) {
         triggerBackgroundAudio();
@@ -1872,6 +1853,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (state.playerReady) {
           state.player.loadVideoById(song.id);
+          if (isSlowMode() && typeof state.player.setPlaybackQuality === "function") {
+            state.player.setPlaybackQuality("tiny");
+          }
         } else {
           state.pendingId = song.id;
         }
@@ -1938,7 +1922,7 @@ document.addEventListener('DOMContentLoaded', () => {
         loadSongs(state.query, state.category);
       });
 
-      document.querySelectorAll(".nav button, .history-top-btn").forEach((button) => {
+      document.querySelectorAll(".nav button, .history-top-btn[data-view]").forEach((button) => {
         button.addEventListener("click", () => {
           const view = button.dataset.view;
           if (view === "home" && state.activePlaylistId) {
@@ -1989,7 +1973,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
       $("qualitySelect").addEventListener("change", (e) => {
         if (state.player && typeof state.player.setPlaybackQuality === "function") {
-          state.player.setPlaybackQuality(e.target.value);
+          state.player.setPlaybackQuality(isSlowMode() ? "tiny" : e.target.value);
+        }
+      });
+
+      $("openSpeedModalBtn").addEventListener("click", openSpeedModeModal);
+
+      $("modalNormalModeBtn").addEventListener("click", () => {
+        applySpeedMode("normal", true);
+        renderFavorites();
+        if (state.view === "history") renderHistory();
+        updatePlayer();
+        closeSpeedModeModal();
+      });
+
+      $("modalSlowModeBtn").addEventListener("click", () => {
+        applySpeedMode("slow", true);
+        renderFavorites();
+        if (state.view === "history") renderHistory();
+        updatePlayer();
+        closeSpeedModeModal();
+      });
+
+      $("speedModeModal").addEventListener("click", (e) => {
+        if (e.target === $("speedModeModal")) {
+          closeSpeedModeModal();
         }
       });
 
@@ -2046,15 +2054,19 @@ document.addEventListener('DOMContentLoaded', () => {
       window.addEventListener("touchmove", handleDragMove, { passive: false });
       window.addEventListener("touchend", handleDragEnd);
 
-      window.__ymusicYoutubeReadyCallback = onYouTubeIframeAPIReady;
-      if (window.__ymusicYoutubeApiReady) onYouTubeIframeAPIReady();
-
-      setTimeout(initAuth, 500);
-      setupMediaSession();
-      renderFavorites();
-      renderPlaylists();
-      renderHistory();
-      loadSongs();
+      document.addEventListener("DOMContentLoaded", () => {
+        applySpeedMode(state.speedMode, false);
+        openSpeedModeModal();
+        if (window.__ymusicYoutubeApiReady) {
+          window.initYMPlayer();
+        }
+        setTimeout(initAuth, 500);
+        setupMediaSession();
+        renderFavorites();
+        renderPlaylists();
+        renderHistory();
+        loadSongs();
+      });
     </script>
   </body>
 </html>
