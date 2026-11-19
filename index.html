@@ -910,11 +910,37 @@
           justify-content: flex-end;
         }
       }
+
+      /* يشتغل فقط لما يكون كلاس slow-net-mode موجود على body */
+body.slow-net-mode img,
+body.slow-net-mode .song-cover,
+body.slow-net-mode .thumbnail,
+body.slow-net-mode [class*="thumb"],
+body.slow-net-mode [class*="cover"] {
+  display: none !important;
+}
+
+body.slow-net-mode *,
+body.slow-net-mode *::before,
+body.slow-net-mode *::after {
+  animation: none !important;
+  transition: none !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+.speed-btn-active {
+  outline: 2px solid #ff9800;
+  font-weight: bold;
+}
     </style>
   </head>
   <body>
     <audio id="backgroundKeepAlive" loop playsinline style="display:none;"></audio>
-
+<div id="speed-mode-switcher" style="display:flex; gap:8px; margin:10px 0;">
+  <button id="btn-normal-use" type="button">الاستخدام العادي</button>
+  <button id="btn-slow-use" type="button">السرعة البطيئة</button>
+</div>
     <main class="shell">
       <header class="topbar">
         <div class="topbar-left">
@@ -1104,6 +1130,93 @@
     </div>
 
     <script type="module">
+      const MODE_STORAGE_KEY = 'ymusic_playback_mode'; // يحفظ 'normal' أو 'slow' فقط
+
+// القراءة الافتراضية: الاستخدام العادي إلا لو اخترت السرعة البطيئة صراحةً
+let currentSpeedMode = localStorage.getItem(MODE_STORAGE_KEY) === 'slow' ? 'slow' : 'normal';
+
+function isSlowMode() {
+  return currentSpeedMode === 'slow';
+}
+
+function applySpeedMode(mode) {
+  currentSpeedMode = mode === 'slow' ? 'slow' : 'normal';
+  localStorage.setItem(MODE_STORAGE_KEY, currentSpeedMode);
+
+  const slowActive = isSlowMode();
+
+  // في الاستخدام العادي: يشيل كلاس السرعة البطيئة ويرجع كل حاجة لطبيعتها
+  document.body.classList.toggle('slow-net-mode', slowActive);
+
+  // تحديث شكل الأزرار
+  const normalBtn = document.getElementById('btn-normal-use');
+  const slowBtn = document.getElementById('btn-slow-use');
+  if (normalBtn) normalBtn.classList.toggle('speed-btn-active', !slowActive);
+  if (slowBtn) slowBtn.classList.toggle('speed-btn-active', slowActive);
+
+  // ضبط مشغل YouTube IFrame إن وجد
+  if (window.ytPlayer && typeof window.ytPlayer.setPlaybackQuality === 'function') {
+    window.ytPlayer.setPlaybackQuality(slowActive ? 'tiny' : 'default');
+  }
+
+  // ضبط عناصر audio / video المباشرة إن وجدت
+  document.querySelectorAll('audio, video').forEach((media) => {
+    if (slowActive) {
+      media.preload = 'none';
+    } else {
+      media.preload = 'metadata';
+    }
+  });
+}
+
+// دالة البحث المباشر (بدون كاش نتائج): 5 في السرعة البطيئة، و20 في الاستخدام العادي
+function buildYouTubeSearchUrl(query, apiKey) {
+  const maxResults = isSlowMode() ? 5 : 20;
+  const params = new URLSearchParams({
+    part: 'snippet',
+    type: 'video',
+    q: query,
+    maxResults: String(maxResults),
+    key: apiKey
+  });
+
+  if (isSlowMode()) {
+    params.set('videoCategoryId', '10');
+  }
+
+  return `https://www.googleapis.com/youtube/v3/search?${params.toString()}`;
+}
+
+// دالة اختيار الصورة: في السرعة البطيئة لا نستخدم صوراً، وفي العادي نرجع الصورة طبيعي
+function getTrackThumbnail(thumbnails) {
+  if (isSlowMode() || !thumbnails) return '';
+  return (
+    (thumbnails.high && thumbnails.high.url) ||
+    (thumbnails.medium && thumbnails.medium.url) ||
+    (thumbnails.default && thumbnails.default.url) ||
+    ''
+  );
+}
+
+// استدعاء هذه الدالة لما مشغل يوتيوب يكون جاهز
+function onYouTubePlayerReady(player) {
+  window.ytPlayer = player;
+  if (isSlowMode() && typeof player.setPlaybackQuality === 'function') {
+    player.setPlaybackQuality('tiny');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  applySpeedMode(currentSpeedMode);
+
+  document.getElementById('btn-normal-use')?.addEventListener('click', () => {
+    applySpeedMode('normal');
+  });
+
+  document.getElementById('btn-slow-use')?.addEventListener('click', () => {
+    applySpeedMode('slow');
+  });
+});
       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
       import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
       import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
