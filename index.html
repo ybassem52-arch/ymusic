@@ -405,47 +405,87 @@
         display: none;
       }
 
+      /* Song Cards Grid - Real Card Layout */
       .songs {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(265px, 1fr));
-        gap: 12px;
+        grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
+        gap: 16px;
       }
 
       .song {
-        display: grid;
-        grid-template-columns: 64px 1fr auto;
-        align-items: center;
-        gap: 12px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
         min-width: 0;
-        padding: 10px;
-        border: 1px solid transparent;
-        border-radius: 17px;
-        background: rgba(17, 19, 24, 0.72);
-        transition: 160ms ease;
-      }
-
-      body.slow-net-mode .song {
-        grid-template-columns: 1fr auto;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        background: var(--panel);
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+        cursor: pointer;
+        transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
       }
 
       .song:hover,
       .song.playing {
-        border-color: rgba(255, 59, 69, 0.45);
+        border-color: rgba(255, 59, 69, 0.65);
         background: var(--panel-2);
-        transform: translateY(-1px);
+        transform: translateY(-4px);
+        box-shadow: 0 16px 36px rgba(0, 0, 0, 0.42);
+      }
+
+      .song-cover-wrap {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        border-radius: 14px;
+        overflow: hidden;
+        background: #20242c;
+        margin-bottom: 12px;
+      }
+
+      body.slow-net-mode .song-cover-wrap {
+        display: none;
       }
 
       .cover {
-        width: 64px;
-        height: 64px;
-        border-radius: 12px;
+        width: 100%;
+        height: 100%;
         object-fit: cover;
-        background: #272b33;
+        display: block;
+        transition: transform 0.25s ease;
+      }
+
+      .song:hover .cover {
+        transform: scale(1.04);
+      }
+
+      .card-play-badge {
+        position: absolute;
+        left: 10px;
+        bottom: 10px;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--red);
+        color: #fff;
+        display: grid;
+        place-items: center;
+        font-size: 14px;
+        box-shadow: 0 8px 20px rgba(255, 59, 69, 0.45);
+        opacity: 0.92;
+        transition: transform 0.18s ease, opacity 0.18s ease;
+      }
+
+      .song:hover .card-play-badge,
+      .song.playing .card-play-badge {
+        opacity: 1;
+        transform: scale(1.06);
       }
 
       .song-main {
         min-width: 0;
-        cursor: pointer;
+        margin-bottom: 10px;
       }
 
       .song-title,
@@ -456,9 +496,10 @@
       }
 
       .song-title {
-        margin-bottom: 5px;
+        margin-bottom: 4px;
         font-size: 14px;
         font-weight: 700;
+        color: var(--text);
       }
 
       .song-artist {
@@ -466,35 +507,43 @@
         font-size: 12px;
       }
 
-      .song-artist-link {
-        cursor: pointer;
-        transition: color 0.15s ease;
+      .song-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-top: 8px;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
       }
 
-      .song-artist-link:hover {
+      .song-status-tag {
+        font-size: 11px;
+        color: var(--muted);
+      }
+
+      .song.playing .song-status-tag {
         color: var(--red);
-        text-decoration: underline;
+        font-weight: 700;
       }
 
       .song-actions {
         display: flex;
-        gap: 2px;
+        gap: 4px;
       }
 
       .icon-button {
         display: grid;
-        width: 35px;
-        height: 35px;
+        width: 32px;
+        height: 32px;
         place-items: center;
         border-radius: 50%;
-        background: transparent;
+        background: rgba(255, 255, 255, 0.04);
         color: var(--muted);
         transition: background 0.2s, color 0.2s;
       }
 
       .icon-button:hover,
       .icon-button.active {
-        background: rgba(255, 59, 69, 0.13);
+        background: rgba(255, 59, 69, 0.18);
         color: var(--red);
       }
 
@@ -568,7 +617,7 @@
 
       .albums-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
         gap: 14px;
         margin-top: 12px;
       }
@@ -1165,6 +1214,16 @@
           padding: 18px;
         }
 
+        .songs {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 12px;
+        }
+
+        .song {
+          padding: 10px;
+          border-radius: 16px;
+        }
+
         .player {
           grid-template-columns: 1fr auto;
           gap: 10px;
@@ -1320,7 +1379,7 @@
             <img id="artistAvatarLg" class="artist-avatar-lg" src="" alt="" />
             <div>
               <h2 id="artistNameHeading">صفحة الفنان</h2>
-              <p id="artistStatsText">ابحث عن اسم فنان أو اضغط على اسم فنان من أي أغنية</p>
+              <p id="artistStatsText">ابحث عن اسم فنان أو افتحه من صفحة الأغنية الكاملة</p>
             </div>
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -1438,7 +1497,7 @@
 
         <button class="seek-btn" id="forward10Btn" title="تقديم 10 ثوانٍ">
           <svg viewBox="0 0 24 24">
-            <path d="M12 5V1l5 5-5 5V7c-3.31 0-6 2.69-6 6s2.69 6-6 6-6-2.69-6-6h2c0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8z"/>
+            <path d="M12 5V1l5 5-5 5V7c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6h2c0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8z"/>
             <text x="12" y="14.5" font-size="7" font-weight="bold" text-anchor="middle" fill="currentColor">10</text>
           </svg>
         </button>
@@ -1722,7 +1781,7 @@
         );
       }
 
-      function songCard(song, customQueue = null) {
+      function songCard(song) {
         const favorite = isFavorite(song.id);
         const playing = state.currentSong?.id === song.id;
         const inPlaylist = state.view === "home" && state.activePlaylistId;
@@ -1731,51 +1790,65 @@
           : `<button class="icon-button" data-add-playlist="${escapeHtml(song.id)}" title="إضافة لقائمة">＋</button>`;
         const thumbSrc = isSlowMode() ? "" : (song.thumbnail || FALLBACK_THUMBNAIL);
         return `
-          <article class="song ${playing ? "playing" : ""}">
-            ${isSlowMode() ? "" : `<img class="cover" src="${escapeHtml(thumbSrc)}" alt="" loading="lazy" />`}
-            <div class="song-main" data-play="${escapeHtml(song.id)}" ${customQueue ? 'data-use-custom-queue="1"' : ""}>
-              <div class="song-title">${escapeHtml(song.title)}</div>
-              <div class="song-artist song-artist-link" data-open-artist="${escapeHtml(song.artist || "YouTube Music")}" title="عرض ألبومات وأغاني الفنان">${escapeHtml(song.artist || "YouTube Music")}</div>
+          <article class="song ${playing ? "playing" : ""}" data-play-card="${escapeHtml(song.id)}">
+            <div>
+              ${
+                isSlowMode()
+                  ? ""
+                  : `<div class="song-cover-wrap">
+                      <img class="cover" src="${escapeHtml(thumbSrc)}" alt="" loading="lazy" />
+                      <span class="card-play-badge">${playing && state.isPlaying ? "❚❚" : "▶"}</span>
+                    </div>`
+              }
+              <div class="song-main">
+                <div class="song-title">${escapeHtml(song.title)}</div>
+                <div class="song-artist">${escapeHtml(song.artist || "YouTube Music")}</div>
+              </div>
             </div>
-            <div class="song-actions">
-              <button class="icon-button ${favorite ? "active" : ""}" data-favorite="${escapeHtml(song.id)}" title="المفضلة">${favorite ? "♥" : "♡"}</button>
-              ${playlistAction}
+            <div class="song-footer">
+              <span class="song-status-tag">${playing ? "قيد التشغيل" : "اضغط للتشغيل"}</span>
+              <div class="song-actions">
+                <button class="icon-button ${favorite ? "active" : ""}" data-favorite="${escapeHtml(song.id)}" title="المفضلة">${favorite ? "♥" : "♡"}</button>
+                ${playlistAction}
+              </div>
             </div>
           </article>
         `;
       }
 
       function bindSongListEvents(container, listItems) {
-        container.querySelectorAll("[data-play]").forEach((button) => {
-          button.addEventListener("click", () => {
-            const song = listItems.find((item) => item.id === button.dataset.play) || findSongById(button.dataset.play);
+        container.querySelectorAll("[data-play-card]").forEach((card) => {
+          card.addEventListener("click", (e) => {
+            if (e.target.closest(".song-actions")) return;
+            const song =
+              listItems.find((item) => item.id === card.dataset.playCard) ||
+              findSongById(card.dataset.playCard);
             if (song) playSong(song, listItems);
           });
         });
 
-        container.querySelectorAll("[data-open-artist]").forEach((el) => {
-          el.addEventListener("click", (e) => {
-            e.stopPropagation();
-            const artist = el.dataset.openArtist;
-            if (artist) openArtistPage(artist);
-          });
-        });
-
         container.querySelectorAll("[data-favorite]").forEach((button) => {
-          button.addEventListener("click", () => {
-            const song = listItems.find((item) => item.id === button.dataset.favorite) || findSongById(button.dataset.favorite);
+          button.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const song =
+              listItems.find((item) => item.id === button.dataset.favorite) ||
+              findSongById(button.dataset.favorite);
             if (song) toggleFavorite(song);
           });
         });
 
         container.querySelectorAll("[data-add-playlist]").forEach((button) => {
-          button.addEventListener("click", () => openSelectPlaylistModal(button.dataset.addPlaylist));
+          button.addEventListener("click", (e) => {
+            e.stopPropagation();
+            openSelectPlaylistModal(button.dataset.addPlaylist);
+          });
         });
 
         container.querySelectorAll("[data-remove-playlist]").forEach((button) => {
-          button.addEventListener("click", () =>
-            removeSongFromPlaylist(button.dataset.removePlaylist, button.dataset.removeSong)
-          );
+          button.addEventListener("click", (e) => {
+            e.stopPropagation();
+            removeSongFromPlaylist(button.dataset.removePlaylist, button.dataset.removeSong);
+          });
         });
       }
 
@@ -1930,7 +2003,7 @@
         }
       });
 
-      // Select Playlist Dropdown Modal Logic (No typing name)
+      // Select Playlist Dropdown Modal Logic
       function populatePlaylistDropdown(selectedId = null) {
         const items = playlists();
         const select = $("playlistSelectDropdown");
@@ -2050,7 +2123,7 @@
       // Artist & Albums Feature
       function inferAlbumName(title) {
         const clean = String(title || "");
-        const match = clean.match(/\(([^)]*(?:album|ألبوم|ep|session|live| Deluxe)[^)]*)\)/i);
+        const match = clean.match(/\(([^)]*(?:album|ألبوم|ep|session|live|Deluxe)[^)]*)\)/i);
         if (match && match[1]) return match[1].trim();
         return "إصدارات وأغاني";
       }
@@ -2212,7 +2285,7 @@
 
         container.innerHTML = state.artistTracks.length
           ? `<div class="songs" id="artistSongsGrid">${state.artistTracks.map((t) => songCard(t)).join("")}</div>`
-          : '<div class="empty">لا توجد أغاني معروضة حالياً. ابحث عن اسم فنان للبدء.</div>';
+          : '<div class="empty">لا توجد أغاني معروضة حالياً. اضغط «بحث عن فنان جديد» للبدء.</div>';
 
         if ($("artistSongsGrid")) {
           bindSongListEvents($("artistSongsGrid"), state.artistTracks);
@@ -2611,6 +2684,7 @@
                 playNext();
               }
               updatePlayer();
+              renderSongs();
             },
             onError: () => {
               state.isPlaying = false;
@@ -2634,6 +2708,10 @@
         saveToHistory(song);
         updateMediaSessionMetadata(song);
         updatePlayer();
+        renderSongs();
+        if (state.view === "favorites") renderFavorites();
+        if (state.view === "history") renderHistory();
+        if (state.view === "artist") renderArtistView();
 
         if ($("nowPlayingOverlay").classList.contains("active")) {
           loadLyricsForSong(song, false);
@@ -2647,11 +2725,6 @@
         } else {
           state.pendingId = song.id;
         }
-      }
-
-      function playSongById(id) {
-        const song = findSongById(id);
-        if (song) playSong(song, state.songs);
       }
 
       function playNext() {
