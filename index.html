@@ -164,10 +164,19 @@
       .user-name {
         font-size: 13px;
         color: var(--text);
-        max-width: 100px;
+        max-width: 110px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+      }
+
+      .sync-badge {
+        font-size: 11px;
+        color: #86efac;
+        background: rgba(34, 197, 94, 0.12);
+        border: 1px solid rgba(34, 197, 94, 0.28);
+        padding: 4px 10px;
+        border-radius: 999px;
       }
 
       .search-box-wrapper {
@@ -405,7 +414,6 @@
         display: none;
       }
 
-      /* Song Cards Grid - Real Card Layout */
       .songs {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
@@ -575,7 +583,6 @@
         }
       }
 
-      /* Artist View Styles */
       .artist-header-card {
         display: flex;
         align-items: center;
@@ -660,7 +667,6 @@
         font-size: 12px;
       }
 
-      /* Mini Player */
       .player {
         position: fixed;
         right: 18px;
@@ -848,7 +854,6 @@
         z-index: -1;
       }
 
-      /* Fullscreen Now Playing View (Spotify-like with Lyrics) */
       .now-playing-overlay {
         position: fixed;
         inset: 0;
@@ -1338,7 +1343,7 @@
         <div class="hero">
           <div class="hero-card">
             <h1>موسيقى على مزاجك.</h1>
-            <p>ابحث عن الأغاني أو الفنانين وشغّلها واحفظ المفضلة والقوائم على جهازك.</p>
+            <p>ابحث عن الأغاني أو الفنانين وشغّلها واحفظ المفضلة والقوائم على حسابك أو جهازك.</p>
           </div>
           <div class="hero-card">
             <h1>شغّله على متصفح Brave</h1>
@@ -1348,7 +1353,7 @@
             <strong id="resultLabel">الأكثر استماعًا</strong>
             <p>المحتوى يتم تحميله مباشرة من YouTube API الرسمي.</p>
             <div class="notice">
-              مدعوم ببحث يوتيوب المباشر وبدون خوادم خارجية.
+              مدعوم ببحث يوتيوب المباشر ومزامنة سحابية لحسابك.
             </div>
           </div>
         </div>
@@ -1399,7 +1404,7 @@
       <section id="favoritesView" hidden>
         <div class="section-head">
           <h2>المفضلة</h2>
-          <small>محفوظة على هذا الجهاز</small>
+          <small id="favoritesSyncLabel">محفوظة على هذا الجهاز</small>
         </div>
         <div id="favorites" class="songs"></div>
       </section>
@@ -1466,7 +1471,7 @@
             </div>
             <pre id="npLyricsText" class="lyrics-text">جارٍ البحث عن كلمات الأغنية...</pre>
             <div id="lyricsEditorBox" class="lyrics-editor" hidden>
-              <textarea id="lyricsTextarea" placeholder="اكتب أو الصق كلمات الأغنية هنا لحفظها على جهازك..."></textarea>
+              <textarea id="lyricsTextarea" placeholder="اكتب أو الصق كلمات الأغنية هنا لحفظها على حسابك وجهازك..."></textarea>
               <button class="primary-button" id="saveLyricsBtn" type="button">حفظ الكلمات</button>
             </div>
           </div>
@@ -1497,7 +1502,7 @@
 
         <button class="seek-btn" id="forward10Btn" title="تقديم 10 ثوانٍ">
           <svg viewBox="0 0 24 24">
-            <path d="M12 5V1l5 5-5 5V7c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6h2c0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8z"/>
+            <path d="M12 5V1l5 5-5 5V7c-3.31 0-6 2.69-6 6s2.69 6-6 6-6-2.69-6-6h2c0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8z"/>
             <text x="12" y="14.5" font-size="7" font-weight="bold" text-anchor="middle" fill="currentColor">10</text>
           </svg>
         </button>
@@ -1582,6 +1587,7 @@
       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
       import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
       import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+      import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
       const firebaseConfig = {
         apiKey: "AIzaSyDec5HEfjnmMXN7MSR3Cm6Lgv5sNlnn-AM",
@@ -1597,6 +1603,7 @@
       const analytics = getAnalytics(app);
       const auth = getAuth(app);
       const provider = new GoogleAuthProvider();
+      const db = getFirestore(app);
 
       window.firebaseAuth = {
         auth,
@@ -1605,6 +1612,29 @@
         signOut,
         onAuthStateChanged
       };
+
+      window.ymusicCloud = {
+        async loadUserLibrary(uid) {
+          const ref = doc(db, "users", uid);
+          const snap = await getDoc(ref);
+          return snap.exists() ? snap.data() : null;
+        },
+        async saveUserLibrary(uid, payload) {
+          const ref = doc(db, "users", uid);
+          await setDoc(
+            ref,
+            {
+              ...payload,
+              updatedAt: Date.now()
+            },
+            { merge: true }
+          );
+        }
+      };
+
+      if (typeof window.__onFirebaseReady === "function") {
+        window.__onFirebaseReady();
+      }
     </script>
 
     <script>
@@ -1638,6 +1668,7 @@
         pendingId: null,
         poller: null,
         user: null,
+        isSyncingFromCloud: false,
         isDragging: false,
         speedMode: localStorage.getItem(MODE_STORAGE_KEY) === "slow" ? "slow" : "normal"
       };
@@ -1701,9 +1732,112 @@
       const historySongs = () => JSON.parse(localStorage.getItem("ymusic-history") || "[]");
       const customLyricsMap = () => JSON.parse(localStorage.getItem("ymusic-lyrics") || "{}");
 
-      const saveFavorites = (items) => localStorage.setItem("ymusic-favorites", JSON.stringify(items));
-      const savePlaylists = (items) => localStorage.setItem("ymusic-playlists", JSON.stringify(items));
-      const saveCustomLyrics = (map) => localStorage.setItem("ymusic-lyrics", JSON.stringify(map));
+      let cloudSyncTimer = null;
+      function scheduleCloudSync() {
+        if (!state.user || state.isSyncingFromCloud || !window.ymusicCloud) return;
+        clearTimeout(cloudSyncTimer);
+        cloudSyncTimer = setTimeout(async () => {
+          try {
+            await window.ymusicCloud.saveUserLibrary(state.user.uid, {
+              email: state.user.email || "",
+              displayName: state.user.displayName || "",
+              favorites: favorites(),
+              playlists: playlists(),
+              history: historySongs(),
+              lyrics: customLyricsMap()
+            });
+          } catch (err) {
+            console.error("Cloud sync error:", err);
+          }
+        }, 350);
+      }
+
+      function mergeArraysById(cloudArr = [], localArr = [], maxLen = null) {
+        const map = new Map();
+        (Array.isArray(cloudArr) ? cloudArr : []).forEach((item) => {
+          if (item && item.id) map.set(item.id, item);
+        });
+        (Array.isArray(localArr) ? localArr : []).forEach((item) => {
+          if (item && item.id && !map.has(item.id)) map.set(item.id, item);
+        });
+        const merged = Array.from(map.values());
+        return maxLen ? merged.slice(0, maxLen) : merged;
+      }
+
+      function mergePlaylists(cloudPl = [], localPl = []) {
+        const map = new Map();
+        (Array.isArray(cloudPl) ? cloudPl : []).forEach((pl) => {
+          if (pl && pl.id) map.set(pl.id, { ...pl, songs: Array.isArray(pl.songs) ? pl.songs : [] });
+        });
+        (Array.isArray(localPl) ? localPl : []).forEach((pl) => {
+          if (!pl || !pl.id) return;
+          if (!map.has(pl.id)) {
+            map.set(pl.id, { ...pl, songs: Array.isArray(pl.songs) ? pl.songs : [] });
+          } else {
+            const existing = map.get(pl.id);
+            existing.name = pl.name || existing.name;
+            existing.songs = mergeArraysById(existing.songs, pl.songs);
+          }
+        });
+        return Array.from(map.values());
+      }
+
+      async function syncUserLibraryOnLogin(user) {
+        if (!user || !window.ymusicCloud) return;
+        state.isSyncingFromCloud = true;
+        try {
+          const cloudData = await window.ymusicCloud.loadUserLibrary(user.uid);
+          if (cloudData) {
+            const mergedFavs = mergeArraysById(cloudData.favorites, favorites());
+            const mergedPls = mergePlaylists(cloudData.playlists, playlists());
+            const mergedHist = mergeArraysById(cloudData.history, historySongs(), 50);
+            const mergedLyrics = {
+              ...(cloudData.lyrics && typeof cloudData.lyrics === "object" ? cloudData.lyrics : {}),
+              ...customLyricsMap()
+            };
+
+            localStorage.setItem("ymusic-favorites", JSON.stringify(mergedFavs));
+            localStorage.setItem("ymusic-playlists", JSON.stringify(mergedPls));
+            localStorage.setItem("ymusic-history", JSON.stringify(mergedHist));
+            localStorage.setItem("ymusic-lyrics", JSON.stringify(mergedLyrics));
+          }
+
+          renderFavorites();
+          renderPlaylists();
+          renderHistory();
+          if (state.currentSong && $("nowPlayingOverlay").classList.contains("active")) {
+            loadLyricsForSong(state.currentSong, false);
+          }
+
+          await window.ymusicCloud.saveUserLibrary(user.uid, {
+            email: user.email || "",
+            displayName: user.displayName || "",
+            favorites: favorites(),
+            playlists: playlists(),
+            history: historySongs(),
+            lyrics: customLyricsMap()
+          });
+        } catch (err) {
+          console.error("Failed to sync user library:", err);
+        } finally {
+          state.isSyncingFromCloud = false;
+        }
+      }
+
+      const saveFavorites = (items) => {
+        localStorage.setItem("ymusic-favorites", JSON.stringify(items));
+        scheduleCloudSync();
+      };
+
+      const savePlaylists = (items) => {
+        localStorage.setItem("ymusic-playlists", JSON.stringify(items));
+        scheduleCloudSync();
+      };
+
+      const saveCustomLyrics = (map) => {
+        localStorage.setItem("ymusic-lyrics", JSON.stringify(map));
+        scheduleCloudSync();
+      };
 
       function saveToHistory(song) {
         let items = historySongs();
@@ -1711,6 +1845,7 @@
         items.unshift(song);
         if (items.length > 50) items.pop();
         localStorage.setItem("ymusic-history", JSON.stringify(items));
+        scheduleCloudSync();
         if (state.view === "history") renderHistory();
       }
 
@@ -1863,6 +1998,9 @@
 
       function renderFavorites() {
         const items = favorites();
+        $("favoritesSyncLabel").textContent = state.user
+          ? `متزامن مع حساب: ${state.user.email}`
+          : "محفوظة على هذا الجهاز";
         $("favorites").innerHTML = items.length
           ? items.map((s) => songCard(s)).join("")
           : '<div class="empty">لم تضف أي أغنية للمفضلة بعد.</div>';
@@ -1879,7 +2017,8 @@
 
       $("clearHistoryBtn").addEventListener("click", () => {
         if (confirm("هل أنت متأكد من مسح سجل الاستماع بالكامل؟")) {
-          localStorage.removeItem("ymusic-history");
+          localStorage.setItem("ymusic-history", "[]");
+          scheduleCloudSync();
           renderHistory();
         }
       });
@@ -1941,7 +2080,6 @@
           });
       }
 
-      // Rename Playlist Modal Logic
       function openRenamePlaylistModal(playlistId) {
         const pl = playlists().find((p) => p.id === playlistId);
         if (!pl) return;
@@ -2003,7 +2141,6 @@
         }
       });
 
-      // Select Playlist Dropdown Modal Logic
       function populatePlaylistDropdown(selectedId = null) {
         const items = playlists();
         const select = $("playlistSelectDropdown");
@@ -2120,7 +2257,6 @@
         if (view === "history") renderHistory();
       }
 
-      // Artist & Albums Feature
       function inferAlbumName(title) {
         const clean = String(title || "");
         const match = clean.match(/\(([^)]*(?:album|ألبوم|ep|session|live|Deluxe)[^)]*)\)/i);
@@ -2312,7 +2448,6 @@
         showView("home");
       });
 
-      // Fullscreen Now Playing & Lyrics
       function cleanTitleForLyrics(rawTitle, rawArtist) {
         const cleanTitle = String(rawTitle || "")
           .replace(/\(.*?\)|\[.*?\]/g, "")
@@ -2358,7 +2493,7 @@
         } catch (e) {}
 
         $("npLyricsText").textContent =
-          "لم يتم العثور على كلمات تلقائية لهذه الأغنية.\nيمكنك الضغط على «تعديل/حفظ الكلمات» لإضافتها يدوياً وحفظها على جهازك.";
+          "لم يتم العثور على كلمات تلقائية لهذه الأغنية.\nيمكنك الضغط على «تعديل/حفظ الكلمات» لإضافتها يدوياً وحفظها على حسابك وجهازك.";
       }
 
       function openNowPlayingOverlay() {
@@ -2436,26 +2571,36 @@
         $("lyricsEditorBox").hidden = true;
       });
 
+      let authInitialized = false;
       function initAuth() {
-        if (!window.firebaseAuth) return;
+        if (authInitialized || !window.firebaseAuth) return;
+        authInitialized = true;
         const { auth, onAuthStateChanged } = window.firebaseAuth;
-        onAuthStateChanged(auth, (user) => {
+        onAuthStateChanged(auth, async (user) => {
           state.user = user;
           updateAuthUI();
+          if (user) {
+            await syncUserLibraryOnLogin(user);
+          }
         });
       }
+
+      window.__onFirebaseReady = initAuth;
 
       function updateAuthUI() {
         const container = $("authContainer");
         if (state.user) {
           container.innerHTML = `
-            <div class="user-avatar-container" id="userProfileBtn" title="تسجيل الخروج">
-              <img src="${escapeHtml(state.user.photoURL || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + state.user.email)}" alt="صورة الحساب" class="user-avatar">
-              <span class="user-name">${escapeHtml(state.user.displayName || state.user.email.split('@')[0])}</span>
+            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+              <span class="sync-badge" title="${escapeHtml(state.user.email || "")}">متزامن</span>
+              <div class="user-avatar-container" id="userProfileBtn" title="${escapeHtml(state.user.email || "")} — اضغط لتسجيل الخروج">
+                <img src="${escapeHtml(state.user.photoURL || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + state.user.email)}" alt="صورة الحساب" class="user-avatar">
+                <span class="user-name">${escapeHtml(state.user.displayName || state.user.email.split('@')[0])}</span>
+              </div>
             </div>
           `;
           $("userProfileBtn").addEventListener("click", async () => {
-            if (confirm("هل تريد تسجيل الخروج؟")) {
+            if (confirm("هل تريد تسجيل الخروج من حسابك؟")) {
               try {
                 await window.firebaseAuth.signOut(window.firebaseAuth.auth);
               } catch (e) {
@@ -2933,7 +3078,7 @@
         if (window.__ymusicYoutubeApiReady) {
           window.initYMPlayer();
         }
-        setTimeout(initAuth, 500);
+        initAuth();
         setupMediaSession();
         renderFavorites();
         renderPlaylists();
